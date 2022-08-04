@@ -1,0 +1,14 @@
+SmugMugApi:
+    # Get api key/secret from https://api.smugmug.com/api/v2/doc/tutorial/api-key.html
+    key: ...
+    secret: ...
+
+Album:
+    SortMethod: Filename
+    SortDirection: Ascending
+    Privacy: Private
+
+Folder:
+    SortMethod: Name
+    SortDirection: Ascending
+    Privacy: Private
