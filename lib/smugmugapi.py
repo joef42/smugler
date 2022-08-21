@@ -111,6 +111,8 @@ class Album():
                         self._images.append(Image(img))
 
             logging.info("%s has %d images", self._resp["Name"], len(self._images))
+        else:
+            logging.debug(f"Lazy load Album {self.getName()}")
 
     def reload(self):
         self._load(lazy=False)
@@ -190,7 +192,7 @@ class Folder():
             for resp in pagedResp:
                 if "Folder" in resp:
                     for folder in resp["Folder"]:
-                        self._children.append(Folder(folder))
+                        self._children.append(Folder(folder, lazy=False))
 
             pagedResp = CurrentSmugMugApi._get(extractUri(self._resp["Uris"]["FolderAlbums"]),
                 paged=True,
@@ -200,7 +202,10 @@ class Folder():
             for resp in pagedResp:
                 if "Album" in resp:
                     for album in resp["Album"]:
-                        self._children.append(Album(album))
+                        self._children.append(Album(album, lazy=False))
+        else:
+            logging.debug(f"Lazy load Folder {self.getName()}")
+
 
     def reload(self):
         self._load(lazy=False)

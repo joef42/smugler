@@ -27,7 +27,7 @@ def loadContentFromFile(saveDir):
 
 def supportedFileFormat(path):
     if path.is_file() and path.suffix.lower().lstrip(".") in (
-        "jpg", "jpeg", "png", "gif", "heic", 
+        "jpg", "jpeg", "png", "gif", "heic",
         "mp4", "mov", "avi", "mpeg", "mpg",
         "m4a", "m4v", "mts", "mkv"):
         return True
@@ -41,21 +41,29 @@ def uploadFiles(node, files):
         node.upload(f)
 
 def scanRecursive(path, nodeName, parent):
+
+    filesToUpload = []
+    folders = []
+
+    def scanMissing():
+        filesToUpload.clear()
+        folders.clear()
+        for p in path.iterdir():
+            if supportedFileFormat(p) and (not node or not node.getImageByFileName(p.name)):
+                filesToUpload.append(p)
+            elif p.is_dir() and not p.name.startswith("_"):
+                folders.append(p)
+        return len(filesToUpload) > 0 or len(folders) > 0
+
     if nodeName:
         node = parent.getChildrenByUrlName(nodeName)
-        if not node:
+        if not node and scanMissing():
             parent.reload()
             node = parent.getChildrenByUrlName(nodeName)
     else:
         node = parent
 
-    filesToUpload = []
-    folders = []
-    for p in path.iterdir():
-        if supportedFileFormat(p) and (not node or not node.getImageByFileName(p.name)):
-            filesToUpload.append(p)
-        elif p.is_dir() and not p.name.startswith("_"):
-            folders.append(p)
+    scanMissing()
 
     if (not node and filesToUpload) or (node and node.isAlbum()):
         if filesToUpload:
@@ -149,7 +157,7 @@ def main():
 
     logging.debug('Started')
 
-    configLocations = [ 
+    configLocations = [
         Path("smuglerconf.yaml"),
         imageDir / "smuglerconf.yaml",
         Path.home() / "smuglerconf.yaml"]
