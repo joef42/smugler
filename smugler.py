@@ -150,9 +150,9 @@ def main():
     logging.debug('Started')
 
     configLocations = [ 
-        Path("smugler_conf.yaml"), 
-        imageDir / "smugler_conf.yaml",
-        Path.home() / "smugler_conf.yaml"]
+        Path("smuglerconf.yaml"),
+        imageDir / "smuglerconf.yaml",
+        Path.home() / "smuglerconf.yaml"]
 
     for cl in configLocations:
         if cl.exists():
