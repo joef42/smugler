@@ -211,17 +211,17 @@ def scanRemoteRecursive(path, parent):
                     parent.deleteImage(i)
                 parent.reload()
 
-def main():
+def main(args):
 
     useCachedContent = True
     debug = False
-    for p in sys.argv[1:-2]:
+    for p in args[1:-2]:
         if p == "--refresh":
             useCachedContent = False
         if p == "--debug":
             debug = True
 
-    imageDir = Path(sys.argv[-1])
+    imageDir = Path(args[-1])
 
     logHandlers = []
     if debug:
@@ -248,7 +248,7 @@ def main():
 
     for cl in configLocations:
         if cl.exists():
-            with open(cl, "r", encoding="utf-8") as fp:
+            with cl.open("r", encoding="utf-8") as fp:
                 config = yaml.safe_load(fp)
             break
     else:
@@ -264,9 +264,9 @@ def main():
         rootFolder = Folder(lazy=True)
 
     try:
-        if sys.argv[-2] == "sync":
+        if args[-2] == "sync":
             upload(imageDir, rootFolder)
-        elif sys.argv[-2] == "syncRemote":
+        elif args[-2] == "syncRemote":
             scanRemoteRecursive(imageDir, rootFolder)
     finally:
         saveContentToFile(imageDir, rootFolder)
