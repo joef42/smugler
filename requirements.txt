@@ -1,0 +1,4 @@
+requests
+requests-oauthlib
+requests_toolbelt
+pyyaml
