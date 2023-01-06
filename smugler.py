@@ -44,11 +44,13 @@ def uploadFiles(node, files):
             retryCount += 1
             try:
                 node.upload(f)
+                break
             except ConnectionError:
                 logging.exception("Failed to upload %r", f)
                 node.reload()
                 if node.hasImage(f):
-                    logging.info
+                    logging.info("Still uploaded successfully")
+                    break
         else:
             logging.error("Giving up after 3 retries")
 
