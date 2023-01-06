@@ -102,7 +102,7 @@ class Album():
 
         if not lazy:
             pagedResp = CurrentSmugMugApi._get(extractUri(self._resp["Uris"]["AlbumImages"]),
-                dataFilter=[],
+                dataFilter=["FileName"],
                 paged=True)
 
             for resp in pagedResp:
@@ -115,6 +115,7 @@ class Album():
             logging.debug(f"Lazy load Album {self.getName()}")
 
     def reload(self):
+        logging.info(f"Reload of Album {self.getName()}")
         self._load(lazy=False)
 
     def getImageByFileName(self, fileName):
@@ -122,6 +123,15 @@ class Album():
             if img.getFileName() == fileName:
                 return img
         return None
+
+    def hasImage(self, path):
+
+        if not hasattr(self, "_filenameCache"):
+            self._filenameCache = dict()
+            for img in self._images:
+                self._filenameCache[img.getFileName()] = img
+
+        return path.name in self._filenameCache
         
     def getImages(self):
         return self._images
@@ -143,9 +153,13 @@ class Album():
 
         start_time = time.time()
         logging.info("Uploading %s (%s) into %s", path.name, sizeFormat(path.stat().st_size), self._resp["Name"])
-        CurrentSmugMugApi.upload(self._resp["Uri"], path)
+        resp = CurrentSmugMugApi.upload(self._resp["Uri"], path)
         elapsed_time = time.time() - start_time
         logging.info("Uploading %s finished. It took (%d s).", path.name, elapsed_time)
+
+        if resp:
+            self._images.append(Image(resp))
+
         return path
 
     def toString(self, depth):
@@ -158,15 +172,17 @@ class Album():
         return "%s [Album]" % (self.getName(),)
 
 Album.uriFilter = ["AlbumImages"]
-Album.dataFilter = []
+Album.dataFilter = ["Name", "Uri"]
 
 class Folder():
 
     def __init__(self, resp=None, lazy=True):
         super().__init__()
+        self._children = []
         self._load(resp, lazy)
 
-    def _load(self, resp=None, lazy=True):
+    def _load(self, resp=None, lazy=True, incremental=False):
+
         if resp:
             self._resp = resp
         elif hasattr(self, "_resp") and self._resp:
@@ -181,9 +197,19 @@ class Folder():
         if "Node" in self._resp:
             self._resp = self._resp["Node"]
 
-        self._children = []
+        def getNameId(o):
+            return (o["Uri"], o["Name"])
 
         if not lazy:
+
+            oldChildrenMap = dict()
+            if incremental:
+                logging.info(f"Incremental load Folder {self.getName()}")
+                for c in self._children:
+                    oldChildrenMap[getNameId(c._resp)] = c
+
+            self._children = []
+
             pagedResp = CurrentSmugMugApi._get(extractUri(self._resp["Uris"]["Folders"]),
                 paged=True,
                 dataFilter=Folder.dataFilter,
@@ -192,7 +218,11 @@ class Folder():
             for resp in pagedResp:
                 if "Folder" in resp:
                     for folder in resp["Folder"]:
-                        self._children.append(Folder(folder, lazy=False))
+                        nameId = getNameId(folder)
+                        if nameId not in oldChildrenMap or oldChildrenMap[nameId].isAlbum():
+                            self._children.append(Folder(folder, lazy=False))
+                        else:
+                            self._children.append(oldChildrenMap[nameId])
 
             pagedResp = CurrentSmugMugApi._get(extractUri(self._resp["Uris"]["FolderAlbums"]),
                 paged=True,
@@ -202,17 +232,29 @@ class Folder():
             for resp in pagedResp:
                 if "Album" in resp:
                     for album in resp["Album"]:
-                        self._children.append(Album(album, lazy=False))
+                        nameId = getNameId(album)
+                        if nameId not in oldChildrenMap or not oldChildrenMap[nameId].isAlbum():
+                            self._children.append(Album(album, lazy=False))
+                        else:
+                            self._children.append(oldChildrenMap[nameId])
+            
         else:
             logging.debug(f"Lazy load Folder {self.getName()}")
 
 
-    def reload(self):
-        self._load(lazy=False)
+    def reload(self, incremental=False):
+        logging.info(f"Reload of {self.getName()}")
+        self._load(lazy=False, incremental=incremental)
 
     def getChildrenByUrlName(self, name):
         for c in self._children:
             if c._resp["UrlName"] == name.translate(urlTransTab):
+                return c
+        return None
+
+    def getChildrenByName(self, name):
+        for c in self._children:
+            if c._resp["Name"] == name:
                 return c
         return None
         
@@ -262,7 +304,7 @@ class Folder():
         return "%s [Folder]" % (self.getName(),)
 
 Folder.uriFilter = ["Folders", "FolderAlbums", "SortFolderAlbums"]
-Folder.dataFilter = []
+Folder.dataFilter = ["Name", "Uri"]
 
 class SmugMug:
 
@@ -423,7 +465,9 @@ class SmugMug:
             r = self.session.post(url, data=file, headers=headers)
             response = self._checkApiResponse(r)
 
-            uploadedFileName = CurrentSmugMugApi._get(response["Image"]["ImageUri"], dataFilter=["FileName"])["Image"]["FileName"]
+            uploadedFile = CurrentSmugMugApi._get(response["Image"]["ImageUri"], dataFilter=["FileName"])["Image"]
+            uploadedFileName = uploadedFile["FileName"]
             if image.name != uploadedFileName:
                 logging.warning("Filename missmatch after upload. Local: %s Remote: %s", image.name, uploadedFileName)
+            return uploadedFile
 

@@ -29,7 +29,7 @@ def supportedFileFormat(path):
     if path.is_file() and path.suffix.lower().lstrip(".") in (
         "jpg", "jpeg", "png", "gif", "heic",
         "mp4", "mov", "avi", "mpeg", "mpg",
-        "m4a", "m4v", "mts", "mkv"):
+        "m4a", "m4v", "mts", "mkv", "wmv"):
         return True
     return False
 
@@ -38,54 +38,138 @@ def error_callback(error):
 
 def uploadFiles(node, files):
     for f in files:
-        node.upload(f)
+        retryCount = 0
+        while retryCount < 3:
+            time.sleep(retryCount * 5)
+            retryCount += 1
+            try:
+                node.upload(f)
+            except ConnectionError:
+                logging.exception("Failed to upload %r", f)
+                node.reload()
+                if node.hasImage(f):
+                    logging.info
+        else:
+            logging.error("Giving up after 3 retries")
 
-def scanRecursive(path, nodeName, parent):
+def scanNewFiles(path: Path, parent):
+
+    assert(path.is_dir())
 
     filesToUpload = []
-    folders = []
+    folders = {}
 
-    def scanMissing():
-        filesToUpload.clear()
-        folders.clear()
-        for p in path.iterdir():
-            if supportedFileFormat(p) and (not node or not node.getImageByFileName(p.name)):
-                filesToUpload.append(p)
-            elif p.is_dir() and not p.name.startswith("_"):
-                folders.append(p)
-        return len(filesToUpload) > 0 or len(folders) > 0
+    for p in path.iterdir():
+        if p.is_dir():
+            if not p.name.startswith("_") and not parent.isAlbum():
+                node = parent.getChildrenByName(p.name) if parent else None
+                contentInSubfolder = scanNewFiles(p, node)
+                if contentInSubfolder:
+                    folders[p.name] = contentInSubfolder
+        elif supportedFileFormat(p) and (not parent or not parent.hasImage(p)):
+            filesToUpload.append(p)
 
-    if nodeName:
-        node = parent.getChildrenByUrlName(nodeName)
-        if not node and scanMissing():
-            parent.reload()
-            node = parent.getChildrenByUrlName(nodeName)
+    if filesToUpload and folders:
+        raise f"Found files and folders in {path}"
+
+    if filesToUpload:
+        return filesToUpload
+    elif folders:
+        return folders
     else:
-        node = parent
+        return None
 
-    scanMissing()
+def refreshFromRemote(changes, parent):
 
-    if (not node and filesToUpload) or (node and node.isAlbum()):
-        if filesToUpload:
+    if isinstance(changes, dict):
+
+        parent.reload(incremental=True)
+
+        for name, subItems in changes.items():
+            node = parent.getChildrenByName(name)
+            if node:
+                refreshFromRemote(subItems, node)
+
+    elif isinstance(changes, list):
+
+        parent.reload()
+
+def uploadChanges(path: Path, changes, parent):
+
+    if isinstance(changes, dict):
+        for name, subItems in changes.items():
+            subPath = path + name
+            node = parent.getChildrenByName(name)
             if not node:
                 node = parent.createAlbum(path.name)
-            else:
-                node.reload()
+            uploadChanges(subPath, subItems, node)
 
-            filesToUpload = [f for f in filesToUpload if not node.getImageByFileName(f.name)]
+    elif isinstance(changes, list):
 
-            if filesToUpload:
-                uploadFiles(node, filesToUpload)
-                node.reload()
-        for f in folders:
-            logging.info("Ignored folder: %s", f)
-    elif folders:
-        if not node:
-            node = parent.createFolder(path.name)
-        for f in folders:
-            scanRecursive(f, f.name, node)
-        for f in filesToUpload:
-            logging.info("Ignored images: %s", f)
+        uploadFiles(node, changes)
+
+def upload(path: Path, root):
+
+    changes = scanNewFiles(path, root)
+
+    if changes:
+
+        refreshFromRemote(changes, root)
+        changes = scanNewFiles(path, root)
+
+        #uploadChanges(path, changes, root)
+
+# def scanRecursive(path, nodeName, parent):
+
+#     filesToUpload = []
+#     folders = []
+
+#     def scanMissing():
+#         filesToUpload.clear()
+#         folders.clear()
+#         for p in path.iterdir():
+#             if supportedFileFormat(p) and (not node or not node.getImageByFileName(p.name)):
+#                 filesToUpload.append(p)
+#             elif p.is_dir() and not p.name.startswith("_"):
+#                 folders.append(p)
+#         return len(filesToUpload) > 0 or len(folders) > 0
+
+#     if nodeName:
+#         node = parent.getChildrenByName(nodeName)
+#         #if not node and scanMissing():
+#         #    # TODO: Selectively reload only this children and not whole parent
+#         #    parent.reload(incremental=True)
+#         #    node = parent.getChildrenByUrlName(nodeName)
+        
+#     else:
+#         node = parent
+
+#     scanMissing()
+
+#     if (not node and filesToUpload) or (node and node.isAlbum()):
+#         if filesToUpload:
+#             if not node:
+#                 node = parent.createAlbum(path.name)
+#             else:
+#                 # TODO: Only reload if different Date Modified
+#                 node.reload()
+
+#             filesToUpload = [f for f in filesToUpload if not node.getImageByFileName(f.name)]
+
+#             if filesToUpload:
+#                 uploadFiles(node, filesToUpload)
+#                 node.reload()
+#         for f in folders:
+#             logging.warning("Ignored folder: %s", f)
+#     elif folders:
+#         if not node:
+#             node = parent.createFolder(path.name)
+#         else:
+#             node.reload(incremental=True)
+#         for f in folders:
+#             scanRecursive(f, f.name, node)
+#         for f in filesToUpload:
+#             logging.warning("Ignored images: %s", f)
 
 def scanRemoteRecursive(path, parent):
     if not parent.isAlbum():
@@ -181,11 +265,13 @@ def main():
 
     try:
         if sys.argv[-2] == "sync":
-            scanRecursive(imageDir, None, rootFolder)
+            upload(imageDir, rootFolder)
         elif sys.argv[-2] == "syncRemote":
             scanRemoteRecursive(imageDir, rootFolder)
     finally:
         saveContentToFile(imageDir, rootFolder)
 
 if __name__ == "__main__":
-    main()
+    import cProfile
+    cProfile.run('main()', sort='cumulative')
+    
