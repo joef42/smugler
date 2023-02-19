@@ -9,6 +9,7 @@ import time
 import sys
 import pickle
 import yaml
+import argparse
 
 def getContentFilePath(saveDir):
     return saveDir / ".smugmugContent"
@@ -63,7 +64,7 @@ def scanNewFiles(path: Path, parent):
 
     for p in path.iterdir():
         if p.is_dir():
-            if not p.name.startswith("_") and not parent.isAlbum():
+            if not p.name.startswith("_") and parent and not parent.isAlbum():
                 node = parent.getChildrenByName(p.name) if parent else None
                 contentInSubfolder = scanNewFiles(p, node)
                 if contentInSubfolder:
@@ -100,15 +101,15 @@ def uploadChanges(path: Path, changes, parent):
 
     if isinstance(changes, dict):
         for name, subItems in changes.items():
-            subPath = path + name
+            subPath = path / name
             node = parent.getChildrenByName(name)
             if not node:
-                node = parent.createAlbum(path.name)
+                node = parent.createAlbum(name)
             uploadChanges(subPath, subItems, node)
 
     elif isinstance(changes, list):
 
-        uploadFiles(node, changes)
+        uploadFiles(parent, changes)
 
 def upload(path: Path, root):
 
@@ -119,7 +120,7 @@ def upload(path: Path, root):
         refreshFromRemote(changes, root)
         changes = scanNewFiles(path, root)
 
-        #uploadChanges(path, changes, root)
+        uploadChanges(path, changes, root)
 
 # def scanRecursive(path, nodeName, parent):
 
@@ -215,18 +216,10 @@ def scanRemoteRecursive(path, parent):
 
 def main(args):
 
-    useCachedContent = True
-    debug = False
-    for p in args[1:-2]:
-        if p == "--refresh":
-            useCachedContent = False
-        if p == "--debug":
-            debug = True
-
-    imageDir = Path(args[-1])
+    imageDir = Path(args.imagePath)
 
     logHandlers = []
-    if debug:
+    if args.debug:
         fileHandler = logging.FileHandler(
             filename=imageDir / ("smugler_%s.log" % datetime.datetime.fromtimestamp(time.time()).strftime('%Y_%m_%d_%H.%M.%S')),
             mode='w')
@@ -237,7 +230,7 @@ def main(args):
     consoleHandler.setLevel(logging.INFO)
     logHandlers.append(consoleHandler)
 
-    logging.basicConfig(level= logging.DEBUG if debug else logging.INFO,
+    logging.basicConfig(level= logging.DEBUG if args.debug else logging.INFO,
                         format="%(asctime)s [%(levelname)s] %(message)s",
                         handlers=logHandlers)
 
@@ -260,20 +253,34 @@ def main(args):
     SmugMug(imageDir / ".smugmugToken", config)
 
     rootFolder = None
-    if useCachedContent:
+    if not args.refresh:
         rootFolder = loadContentFromFile(imageDir)
     if not rootFolder:
         rootFolder = Folder(lazy=True)
 
     try:
-        if args[-2] == "sync":
+        if args.action == "sync":
             upload(imageDir, rootFolder)
-        elif args[-2] == "syncRemote":
+        elif args.action == "syncRemote":
             scanRemoteRecursive(imageDir, rootFolder)
     finally:
         saveContentToFile(imageDir, rootFolder)
 
 if __name__ == "__main__":
-    import cProfile
-    cProfile.run('main()', sort='cumulative')
+
+    parser = argparse.ArgumentParser(description='Sync folder to Smugmug')
+    parser.add_argument('action', type=str, choices=["sync", "syncRemote"], help='sync: Upload images to Smugmug\nsyncRemote: Remove images from Smugmug not found locally')
+    parser.add_argument('imagePath', type=str, help='Path to local gallery')
+    parser.add_argument('--refresh', action='store_true', help='Refresh status from Smugmug')
+    parser.add_argument('--debug', action='store_true', help='Print additional debug trace')
+    args = parser.parse_args()
+
+    def run():
+        main(args)
+
+    if args.debug:
+        import cProfile
+        cProfile.run('run()', sort='cumulative')
+    else:
+        run()
     
