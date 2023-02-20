@@ -91,42 +91,34 @@ class TestSmugler(unittest.TestCase):
                     break
         return node
 
-#https://api.smugmug.com/api/v2/folder/user/testuser!folders?_filteruri=Folders%2CFolderAlbums%2CSortFolderAlbums&_filter=Name%2CUri&_verbosity=1&_shorturis=1
+    def folderResponder(self, request):
 
-    def registerFolderCalls(self):
+        resp = None
 
-        def folderMatcher(request):
-            if request.method == "GET" and "!folders" in request.path:
+        if request.method == "GET":
 
-                folderPath = request.path.replace("/api/v2/folder/user/testuser", "").replace("!folders", "")
+            folderPath = request.path.replace("/api/v2/folder/user/testuser", "").replace("!folders", "")
 
-                node = self.traversePath(folderPath)
-                if not isinstance(node, dict):
-                    node = None
+            node = self.traversePath(folderPath)
+            if not isinstance(node, dict):
+                node = None
 
+            if node is not None:
                 resp = requests.Response()
-                if node is not None:
 
-                    responseFolders = []
-                    for k, v in node:
-                        if isinstance(v, dict):
-                            responseFolders.append({
-                                "Name": k
-                            })
+                responseFolders = []
+                for k, v in node:
+                    if isinstance(v, dict):
+                        responseFolders.append({
+                            "Name": k
+                        })
 
-                    resp.status_code = 200
-                    resp._content = json.dumps({"Response" : {"Folder": responseFolders}}).encode("ascii")
+                resp.status_code = 200
+                resp._content = json.dumps({"Response" : {"Folder": responseFolders}}).encode("ascii")
 
-                    return resp
+        return resp
 
-            return None
-
-        self.request_mock.add_matcher(folderMatcher)
-
-
-#https://api.smugmug.com/api/v2/folder/user/testuser!albums?_filteruri=AlbumImages&_filter=Name%2CUri&_verbosity=1&_shorturis=1
-
-    def registerAlbumCalls(self):
+    def albumResponder(self, request):
 
         def createAlbum(name, albumPath):
             return  {
@@ -134,81 +126,81 @@ class TestSmugler(unittest.TestCase):
                         "Name": name
                     }
 
-        def createImage(name, albumPath):
-            return  {
-                        "Uri": f"/api/v2/folder/user/testuser{albumPath}/{name}!albums",
-                        "Name": name
-                    }
+        resp = None
 
-        def uploadImageResponse(name):
-            return  {
-                        "stat": "ok",
-                        "Image": {
-                            "ImageUri": "/api/v2/album/<key>/image/<key>-0"
-                        }
-                    }
+        albumPath = request.path.replace("/api/v2/folder/user/testuser", "").replace("!albums", "")
+
+        if request.method == "GET":
+
+            node = self.traversePath(albumPath)
+            if not isinstance(node, dict):
+                node = None
+            if node is not None:
+
+                resp = requests.Response()
+
+                responseAlbums = []
+                for k, v in node:
+                    if isinstance(v, list):
+                        responseAlbums.append(createAlbum(k, albumPath))
+
+                resp.status_code = 200
+                resp._content = json.dumps({"Response" : {"Album": responseAlbums}}).encode("ascii")
+
+        elif request.method == "POST":
+
+            albumName = parse_qs(request.text)["Name"][0]
+
+            resp = requests.Response()
+            resp.status_code = 200
+            resp._content = json.dumps({"Album": createAlbum(albumName, albumPath)}).encode("ascii")
+
+        return resp
+
+    def imageResponder(self, request):
+
+        resp = None
+
+        if request.method == "GET":
+            fileName = request.path.replace("/api/v2/image/", "").replace("-0", "")
+            resp = requests.Response()
+            resp._content = json.dumps(testResponses.imageResponse(fileName)).encode("ascii")
+            resp.status_code = 200
+
+        return resp
+
+    def uploadResponder(self, request):
+
+        resp = None
+
+        if request.method == "POST":
+            fileName = request.text.fields['upload_file'][0]
+
+            resp = requests.Response()
+            resp._content = json.dumps(testResponses.uploadResponse(fileName).encode("ascii")
+            resp.status_code = 200
+
+        return resp
+
+    def registerAlbumCalls(self):
 
 
         def albumMatcher(request):
             print(request.path)
+
+            if "!folders" in request.path:
+                return self.folderResponder(request)
+
             if "!albums" in request.path:
+                return self.albumResponder(request)
 
-                albumPath = request.path.replace("/api/v2/folder/user/testuser", "").replace("!albums", "")
+            if "/api/v2/image/" in request.path:
+                return self.imageResponder(request)
 
-                if request.method == "GET":
-
-                    node = self.traversePath(albumPath)
-                    if not isinstance(node, dict):
-                        node = None
-
-                    resp = requests.Response()
-                    if node is not None:
-
-                        responseAlbums = []
-                        for k, v in node:
-                            if isinstance(v, list):
-                                responseAlbums.append(createAlbum(k, albumPath))
-
-                        resp.status_code = 200
-                        resp._content = json.dumps({"Response" : {"Album": responseAlbums}}).encode("ascii")
-
-                        return resp
-
-                elif request.method == "POST":
-
-                    albumName = parse_qs(request.text)["Name"][0]
-
-                    resp = requests.Response()
-                    resp.status_code = 200
-                    resp._content = json.dumps({"Album": createAlbum(albumName, albumPath)}).encode("ascii")
-
-                    return resp
-
-            elif "/api/v2/image/" in request.path:
-
-                fileName = request.path.replace("/api/v2/image/", "").replace("-0", "")
-
-                if request.method == "GET":
+            if "upload.smugmug.com" == request.hostname:
+                return self.uploadResponder(request)
 
 
-                    resp = requests.Response()
-                    resp._content = json.dumps(testResponses.imageResponse(fileName)).encode("ascii")
-                    resp.status_code = 200
-
-                    return resp
-
-
-            elif "upload.smugmug.com" == request.hostname:
-
-                print(request.text.fields['upload_file'][0])
-                print(request.text.fields['upload_file'][1].read())
-
-
-                resp = requests.Response()
-                resp._content = json.dumps(testResponses.uploadResponse(request.text.fields['upload_file'][0])).encode("ascii")
-                resp.status_code = 200
-
-                return resp
 
             return None
 
