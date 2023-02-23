@@ -80,6 +80,21 @@ class TestSmugler(unittest.TestCase):
             '//api.smugmug.com/api/v2/folder/user/testuser?',
             json=dataUserFolder)
 
+    def registerGetFoldersCall(self, folders, path=""):
+        self.request_mock.register_uri('GET',
+            '//api.smugmug.com/api/v2/folder/user/testuser!folders',
+            json=testResponses.getFoldersResponse(folders, path))
+
+    def registerGetAlbumsCall(self, albums, path=""):
+        self.request_mock.register_uri('GET',
+            '//api.smugmug.com/api/v2/folder/user/testuser!albums',
+            json=testResponses.getAlbumsResponse(albums, path))
+
+    def registerGetImagesCall(self, albumName, images):
+        self.request_mock.register_uri('GET',
+            f'//api.smugmug.com/api/v2/album/{testResponses.getItemId(albumName)}!images',
+            json=testResponses.getImagesResponse(albumName, images))
+
     def traversePath(self, path):
         node = self.remoteFolders
         if path:
@@ -157,6 +172,7 @@ class TestSmugler(unittest.TestCase):
 
         return resp
 
+
     def imageResponder(self, request):
 
         resp = None
@@ -177,7 +193,7 @@ class TestSmugler(unittest.TestCase):
             fileName = request.text.fields['upload_file'][0]
 
             resp = requests.Response()
-            resp._content = json.dumps(testResponses.uploadResponse(fileName).encode("ascii")
+            resp._content = json.dumps(testResponses.uploadResponse(fileName)).encode("ascii")
             resp.status_code = 200
 
         return resp
@@ -228,9 +244,9 @@ class TestSmugler(unittest.TestCase):
 
         self.registerUserBaseCalls()
 
-        self.remoteFolders = {}
-        self.registerFolderCalls()
-        self.registerAlbumCalls()
+        #self.remoteFolders = {}
+        #self.registerFolderCalls()
+        #self.registerAlbumCalls()
 
     def run(self, result=None):
         with requests_mock.Mocker() as self.request_mock:
@@ -241,6 +257,11 @@ class TestSmugler(unittest.TestCase):
 
     def testSimpleUpload(self):
         self.createLocalFiles(self.tempDir, { "Album1": ["File1.jpg"]})
+
+        self.registerGetFoldersCall([], "")
+        self.registerGetAlbumsCall(["Album1"], "")
+        self.registerGetImagesCall("Album1", ["File1.jpg"])
+
         smugler.main(Args("sync", self.tempDir))
 
 

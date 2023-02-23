@@ -95,7 +95,7 @@ def refreshFromRemote(changes, parent):
 
     elif isinstance(changes, list):
 
-        parent.reload()
+        parent.reloadChildren()
 
 def uploadChanges(path: Path, changes, parent):
 
@@ -143,7 +143,7 @@ def upload(path: Path, root):
 #         #    # TODO: Selectively reload only this children and not whole parent
 #         #    parent.reload(incremental=True)
 #         #    node = parent.getChildrenByUrlName(nodeName)
-        
+
 #     else:
 #         node = parent
 
@@ -283,4 +283,4 @@ if __name__ == "__main__":
         cProfile.run('run()', sort='cumulative')
     else:
         run()
-    
+

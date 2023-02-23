@@ -101,22 +101,26 @@ class Album():
         self._images = []
 
         if not lazy:
-            pagedResp = CurrentSmugMugApi._get(extractUri(self._resp["Uris"]["AlbumImages"]),
-                dataFilter=["FileName"],
-                paged=True)
-
-            for resp in pagedResp:
-                if "AlbumImage" in resp:
-                    for img in resp["AlbumImage"]:
-                        self._images.append(Image(img))
-
-            logging.info("%s has %d images", self._resp["Name"], len(self._images))
+            self.reloadChildren()
         else:
             logging.debug(f"Lazy load Album {self.getName()}")
 
     def reload(self):
         logging.info(f"Reload of Album {self.getName()}")
         self._load(lazy=False)
+
+    def reloadChildren(self):
+        pagedResp = CurrentSmugMugApi._get(extractUri(self._resp["Uris"]["AlbumImages"]),
+            dataFilter=["FileName"],
+            paged=True)
+
+        for resp in pagedResp:
+            if "AlbumImage" in resp:
+                for img in resp["AlbumImage"]:
+                    self._images.append(Image(img))
+
+        logging.info("%s has %d images", self._resp["Name"], len(self._images))
+
 
     def getImageByFileName(self, fileName):
         for img in self._images:
@@ -132,10 +136,10 @@ class Album():
                 self._filenameCache[img.getFileName()] = img
 
         return path.name in self._filenameCache
-        
+
     def getImages(self):
         return self._images
-        
+
     def deleteImage(self, image):
         self._images.remove(image)
         CurrentSmugMugApi._delete(image._resp["Uri"])
@@ -237,7 +241,7 @@ class Folder():
                             self._children.append(Album(album, lazy=False))
                         else:
                             self._children.append(oldChildrenMap[nameId])
-            
+
         else:
             logging.debug(f"Lazy load Folder {self.getName()}")
 
@@ -257,7 +261,7 @@ class Folder():
             if c._resp["Name"] == name:
                 return c
         return None
-        
+
     def getChildren(self):
         return self._children
 
@@ -324,7 +328,7 @@ class SmugMug:
         self.config = config
         while self.createOAuthSession() == False:
             self.requestToken()
-        
+
         if not CurrentSmugMugApi:
             CurrentSmugMugApi = self
 
@@ -398,7 +402,7 @@ class SmugMug:
 
     def _post(self, method, data, **params):
         return self._call("post", method, data=data, **params)
-        
+
     def _delete(self, method, **params):
         return self._call("delete", method, **params)
 
