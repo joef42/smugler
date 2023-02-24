@@ -290,6 +290,63 @@ class TestSmugler(unittest.TestCase):
 
         self.assertLocalEqRemote()
 
+    def testComplexStructure(self):
+        self.createLocalFiles(self.tempDir, {
+            "Folder1":
+            {
+                "Folder1_1" : { "Album1_1_1": ["File1_1_1_1.jpg"] },
+                "Album1_1": ["File1_1_1.jpg", "File1_1_2.jpg"]
+            },
+            "Album1" : ["File1_2.jpg", "File1_1.jpg"]
+        })
+
+        smugler.main(Args("sync", self.tempDir))
+
+        self.assertLocalEqRemote()
+
+    def testIgnoredFolders(self):
+        self.createLocalFiles(self.tempDir, {
+            "Folder1":
+            {
+                "Album1_1": ["File1_1_1.jpg", "File1_1_2.jpg"]
+            },
+            "_NoFolder2":
+            {
+                "Album2_1": ["File2_1_1.jpg", "File2_1_2.jpg"]
+            },
+            "Album1" : ["File1_2.jpg", "File1_1.jpg"]
+        })
+
+        smugler.main(Args("sync", self.tempDir))
+
+        del self.local["_NoFolder2"]
+        self.assertLocalEqRemote()
+
+    def testIgnoredAlbum(self):
+        self.createLocalFiles(self.tempDir, {
+            "Folder1":
+            {
+                "_Album1_1": ["File1_1_1.jpg", "File1_1_2.jpg"]
+            },
+            "_Album1" : ["File1_2.jpg", "File1_1.jpg"]
+        })
+
+        smugler.main(Args("sync", self.tempDir))
+        self.local = {}
+        self.assertLocalEqRemote()
+
+    def testEmptyFolder(self):
+        self.createLocalFiles(self.tempDir, {
+            "Folder1":
+            {
+                "Folder1_1": {}
+            }
+        })
+
+        smugler.main(Args("sync", self.tempDir))
+        self.local = {}
+        self.assertLocalEqRemote()
+
     def testSimpleNoUpload(self):
         self.createLocalFiles(self.tempDir, {"Album1": ["File1.jpg"]})
         self.remote = { "Album1": ["File1.jpg"]}
