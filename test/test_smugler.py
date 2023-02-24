@@ -104,7 +104,7 @@ class TestSmugler(unittest.TestCase):
     def createResponse(self, response, code = 200):
         resp = requests.Response()
         resp.status_code = code
-        resp._content = json.dumps(response).encode("ascii")
+        resp._content = json.dumps(response).encode("ascii") # pylint: disable=protected-access
         return resp
 
     def traversePath(self, path):
@@ -112,8 +112,9 @@ class TestSmugler(unittest.TestCase):
         path = path.strip("/")
         if path:
             for p in path.split("/"):
-                if isinstance(node, dict) and p in node:
-                    node = node[p]
+                lowerDict = dict((k.lower(), k) for k in node)
+                if isFolder(node) and p.lower() in lowerDict:
+                    node = node[lowerDict[p]]
                 else:
                     node = None
                     break
@@ -180,7 +181,7 @@ class TestSmugler(unittest.TestCase):
             elif method == "POST":
                 name = parse_qs(request.text)["Name"][0]
                 self.assertNotIn(name, node)
-                node[name.lower()] = {}
+                node[name] = {}
                 return self.createResponse(testResponses.postFolderResponse(name, nodePath))
 
         m = re.search("folder/user/testuser(.*)!albums", urlPath)
@@ -223,43 +224,69 @@ class TestSmugler(unittest.TestCase):
         self.assertEqual(self.request_mock.call_count, count)
 
     def createLocalFiles(self, path, node):
+        def recur(path, node):
+            if isinstance(node, dict):
+                for nextNode, subItems in node.items():
+                    nextPath = os.path.join(path, nextNode)
+                    os.mkdir(nextPath)
 
-        if isinstance(node, dict):
-            for nextNode, subItems in node.items():
-                nextPath = os.path.join(path, nextNode)
-                os.mkdir(nextPath)
+                    recur(nextPath, subItems)
 
-                self.createLocalFiles(nextPath, subItems)
+            elif isinstance(node, list):
+                for file in node:
+                    with open(os.path.join(path, file), "w", encoding="utf-8") as fp:
+                        fp.write(file)
 
-        elif isinstance(node, list):
-            for file in node:
-                with open(os.path.join(path, file), "w", encoding="utf-8") as fp:
-                    fp.write(file)
+        self.local = node
+        recur(path, node)
+
+    def assertLocalEqRemote(self):
+        self.assertEqual(self.local, self.remote)
 
     def run(self, result=None):
+
         with requests_mock.Mocker() as self.request_mock:
             super(TestSmugler, self).run(result)
+
+        #for r in self.request_mock.request_history:
+        #    print(r.method)
+        #    print("  " + r.hostname)
+        #    print("  " + r.path)
+        #    print("  " + repr(r.headers))
+        #    print("  " + repr(r.text))
 
     def testSimpleEmptyUser(self):
         smugler.main(Args("sync", self.tempDir))
         self.assertCallCount(2)
 
     def testSimpleUpload(self):
-        self.createLocalFiles(self.tempDir, { "Album1": ["File1.jpg"]})
+        self.createLocalFiles(self.tempDir, {"Album1": ["File1.jpg"]})
+
         smugler.main(Args("sync", self.tempDir))
 
+        self.assertLocalEqRemote()
+
     def testMultipleUpload(self):
-        self.createLocalFiles(self.tempDir, { "Album1": ["File1.jpg", "File2.jpg"], "Album2": ["File3.jpg", "File4,jpg"]})
+        self.createLocalFiles(self.tempDir, {"Album1": ["File1.jpg", "File2.jpg"], "Album2": ["File3.jpg", "File4.jpg"]})
+
         smugler.main(Args("sync", self.tempDir))
+
+        self.assertLocalEqRemote()
 
     def testWithFolder(self):
         self.createLocalFiles(self.tempDir, { "Folder1": {"Album1": ["File1.jpg", "File2.jpg"]}})
+
         smugler.main(Args("sync", self.tempDir))
 
+        self.assertLocalEqRemote()
+
     def testSimpleNoUpload(self):
-        self.createLocalFiles(self.tempDir, { "Album1": ["File1.jpg"]})
+        self.createLocalFiles(self.tempDir, {"Album1": ["File1.jpg"]})
         self.remote = { "Album1": ["File1.jpg"]}
+
         smugler.main(Args("sync", self.tempDir))
+
+        self.assertLocalEqRemote()
 
 if __name__ == '__main__':
     unittest.main()

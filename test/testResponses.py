@@ -4,7 +4,7 @@
 from hashlib import md5
 
 def getItemId(item):
-    return md5(item.encode('utf-8')).hexdigest()[:6]
+    return md5(item.lower().encode('utf-8')).hexdigest()[:6]
 
 def folderItem(folderName, path):
     return {
