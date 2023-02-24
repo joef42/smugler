@@ -64,7 +64,7 @@ def scanNewFiles(path: Path, parent):
 
     for p in path.iterdir():
         if p.is_dir():
-            if not p.name.startswith("_") and parent and not parent.isAlbum():
+            if not p.name.startswith("_") and (not parent or not parent.isAlbum()):
                 node = parent.getChildrenByName(p.name) if parent else None
                 contentInSubfolder = scanNewFiles(p, node)
                 if contentInSubfolder:
@@ -104,7 +104,10 @@ def uploadChanges(path: Path, changes, parent):
             subPath = path / name
             node = parent.getChildrenByName(name)
             if not node:
-                node = parent.createAlbum(name)
+                if isinstance(subItems, dict):
+                    node = parent.createFolder(name)
+                else:
+                    node = parent.createAlbum(name)
             uploadChanges(subPath, subItems, node)
 
     elif isinstance(changes, list):

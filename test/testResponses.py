@@ -47,6 +47,18 @@ def getFoldersResponse(folders, path):
                 "Message": "Ok"
             }
 
+def postFolderResponse(folderName, path):
+    return {
+        "Response": {
+            "Uri": f"/api/v2/folder/user/testuser/{path}!folders",
+            "Locator": "Folder",
+            "LocatorType": "Objects",
+            "Folder": folderItem(folderName, path)
+        },
+        "Code": 200,
+        "Message": "Created"
+        }
+
 def albumItem(albumName, path):
 
     albumId = getItemId(albumName)
@@ -125,8 +137,20 @@ def getAlbumsResponse(albums, path):
         "Message": "Ok"
         }
 
+def postAlbumResponse(albumName, path):
+    return {
+        "Response": {
+            "Uri": f"/api/v2/folder/user/testuser/{path}!albums",
+            "Locator": "Album",
+            "LocatorType": "Objects",
+            "Album": albumItem(albumName, path)
+        },
+        "Code": 200,
+        "Message": "Created"
+        }
+
 def imageItem(imageName):
-    imageId = getItemId(imageName)
+    #imageId = getItemId(imageName)
     return {
         "Title": imageName,
         #"Caption": "",
@@ -170,7 +194,7 @@ def imageItem(imageName):
             #    "text": imageName
             #}
         #},
-        "Uri": f"/api/v2/album/{imageId}/image/{imageId}-0",
+        #"Uri": f"/api/v2/album/{imageId}/image/{imageId}-0",
         #"WebUri": f"https://testuser.smugmug.com{path}/{albumName}/i-{imageId}",
         #"Movable": true,
         #"Origin": "Album"
@@ -188,14 +212,27 @@ def getImagesResponse(albumName, images):
         "Message": "Ok"
     }
 
-def uploadResponse(imageId):
+def getImageResponse(imageName):
+    return {
+        "Response": {
+            "Uri": f"/api/v2/image/{getItemId(imageName)}-0",
+            "Locator": "Image",
+            "LocatorType": "Object",
+            "Image": {
+                "FileName": imageName
+            }
+        },
+        "Code": 200,
+        "Message": "Ok"
+    }
 
+def uploadResponse(imageName):
     return {
                 "stat": "ok",
                 "method": "smugmug.images.upload",
                 "Image": {
                     #"StatusImageReplaceUri": null,
-                    "ImageUri": f"/api/v2/image/{imageId}-0",
+                    "ImageUri": f"/api/v2/image/{getItemId(imageName)}-0",
                     #"AlbumImageUri": f"/api/v2/album/{albumId}/image/{imageId}-0",
                     #"URL": ""
                 },
@@ -206,17 +243,4 @@ def uploadResponse(imageId):
             }
 
 
-def imageResponse(fileName):
 
-    return {
-                "Response": {
-                    "Uri": f"/api/v2/image/{fileName}-0",
-                    "Locator": "Image",
-                    "LocatorType": "Object",
-                    "Image": {
-                        "FileName": fileName
-                    }
-                },
-                "Code": 200,
-                "Message": "Ok"
-            }
