@@ -228,7 +228,7 @@ class TestSmugler(unittest.TestCase):
             if isinstance(node, dict):
                 for nextNode, subItems in node.items():
                     nextPath = os.path.join(path, nextNode)
-                    os.mkdir(nextPath)
+                    os.makedirs(nextPath, exist_ok=True)
 
                     recur(nextPath, subItems)
 
@@ -275,6 +275,34 @@ class TestSmugler(unittest.TestCase):
         smugler.main(Args("sync", self.tempDir))
 
         self.assertLocalEqRemote()
+
+    def repeatStateIterations(self, iterations):
+        for localState, expectedState in iterations:
+            if localState:
+                self.createLocalFiles(self.tempDir, localState)
+
+            smugler.main(Args("sync", self.tempDir))
+
+            if expectedState:
+                self.local = expectedState
+            self.assertLocalEqRemote()
+
+    def testRepeatedUpload(self):
+        self.repeatStateIterations([
+            ({"Album1": ["File1.jpg"], "Folder1" : {}}, {"Album1": ["File1.jpg"]}),
+            ({"Album1": ["File1.jpg", "File2.jpg"], "Folder1" : {}}, {"Album1": ["File1.jpg", "File2.jpg"]}),
+            (None, None),
+            ({"Album1": ["File1.jpg", "File2.jpg", "File3.jpg"], "Folder1" : {"Album1_1": []}}, {"Album1": ["File1.jpg", "File2.jpg", "File3.jpg"]}),
+            (None, None),
+            ({"Album1": ["File1.jpg", "File2.jpg", "File3.jpg"], "Folder1" : {"Album1_1": [ "File1_1_2.jpg", "File1_1_1.jpg" ]}}, None),
+            (None, None)
+        ])
+
+    def testIncompleteLocal(self):
+        self.repeatStateIterations([
+            ({"Folder1" : {"Album1_1": [ "File1_1_2.jpg", "File1_1_1.jpg" ]}}, None),
+            ({"Album2": ["File2_1.jpg", "File2_2.jpg"]}, {"Folder1" : {"Album1_1": [ "File1_1_2.jpg", "File1_1_1.jpg" ]}, "Album2": ["File2_1.jpg", "File2_2.jpg"]})
+        ])
 
     def testMultipleUpload(self):
         self.createLocalFiles(self.tempDir, {"Album1": ["File1.jpg", "File2.jpg"], "Album2": ["File3.jpg", "File4.jpg"]})

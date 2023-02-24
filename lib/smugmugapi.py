@@ -88,6 +88,7 @@ class Album():
 
     def __init__(self, resp, lazy=True):
         super().__init__()
+        self._filenameCache = dict()
         self._load(resp, lazy)
 
     def _load(self, resp=None, lazy=True):
@@ -99,6 +100,7 @@ class Album():
                 uriFilter=Album.uriFilter)["Album"]
 
         self._images = []
+        self._filenameCache.clear()
 
         if not lazy:
             self.reloadChildren()
@@ -114,6 +116,7 @@ class Album():
             dataFilter=["FileName"],
             paged=True)
 
+        self._filenameCache.clear()
         for resp in pagedResp:
             if "AlbumImage" in resp:
                 for img in resp["AlbumImage"]:
@@ -129,9 +132,7 @@ class Album():
         return None
 
     def hasImage(self, path):
-
-        if not hasattr(self, "_filenameCache"):
-            self._filenameCache = dict()
+        if not self._filenameCache:
             for img in self._images:
                 self._filenameCache[img.getFileName()] = img
 
@@ -141,6 +142,7 @@ class Album():
         return self._images
 
     def deleteImage(self, image):
+        self._filenameCache.clear()
         self._images.remove(image)
         CurrentSmugMugApi._delete(image._resp["Uri"])
 
@@ -162,6 +164,7 @@ class Album():
         logging.info("Uploading %s finished. It took (%d s).", path.name, elapsed_time)
 
         if resp:
+            self._filenameCache.clear()
             self._images.append(Image(resp))
 
         return path

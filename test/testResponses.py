@@ -25,7 +25,7 @@ def folderItem(folderName, path):
                 #"UrlPath": "{path}/{folderName}",
                 #"NodeID": getItemId(folderName),
                 #"IsEmpty": false,
-                #"Uri": f"/api/v2/folder/user/testuser{path}/{folderName}",
+                "Uri": f"/api/v2/folder/user/testuser{path}/{folderName}",
                 #"WebUri": f"https://testuser.smugmug.com/testuser{path}/{folderName}",
                 "Uris": {
                     "Folders": f"/api/v2/folder/user/testuser{path}/{folderName}!folders",
