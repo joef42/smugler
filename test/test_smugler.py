@@ -241,6 +241,16 @@ class TestSmugler(unittest.TestCase):
         recur(path, node)
 
     def assertLocalEqRemote(self):
+
+        def sortLists(node):
+            if isFolder(node):
+                for _, nextNode in node.items():
+                    sortLists(nextNode)
+            else:
+                node.sort()
+
+        sortLists(self.local)
+        sortLists(self.remote)
         self.assertEqual(self.local, self.remote)
 
     def run(self, result=None):
