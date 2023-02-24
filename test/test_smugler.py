@@ -6,6 +6,10 @@ import tempfile
 import yaml
 import pickle
 from urllib.parse import parse_qs
+import re
+import requests
+import json
+from collections import deque
 
 import unittest
 import requests_mock
@@ -13,6 +17,12 @@ import requests_mock
 from test import testResponses
 
 import smugler
+
+def isFolder(node):
+    return isinstance(node, dict)
+
+def isAlbum(node):
+    return isinstance(node, list)
 
 class Args:
     def __init__(self, action, imagePath, refresh=False, debug=False):
@@ -30,7 +40,10 @@ class TestSmugler(unittest.TestCase):
         self.createConfig()
         self.createToken()
 
+        self.remote = {}
+
         self.registerUserBaseCalls()
+        self.request_mock.add_matcher(self.remoteHandler)
 
     def createConfig(self, content = None):
         if not content:
@@ -83,45 +96,131 @@ class TestSmugler(unittest.TestCase):
             '//api.smugmug.com/api/v2/folder/user/testuser?',
             json=dataUserFolder)
 
-    def registerGetFoldersCall(self, folders, path=""):
-        self.request_mock.register_uri('GET',
-            '//api.smugmug.com/api/v2/folder/user/testuser!folders',
-            json=testResponses.getFoldersResponse(folders, path))
+    def createErrorResponse(self, code = 400):
+        resp = requests.Response()
+        resp.status_code = code
+        return resp
 
-    def registerGetAlbumsCall(self, albums, path=""):
-        self.request_mock.register_uri('GET',
-            '//api.smugmug.com/api/v2/folder/user/testuser!albums',
-            json=testResponses.getAlbumsResponse(albums, path))
+    def createResponse(self, response, code = 200):
+        resp = requests.Response()
+        resp.status_code = code
+        resp._content = json.dumps(response).encode("ascii")
+        return resp
 
-    def registerGetImagesCall(self, albumName, images):
-        self.request_mock.register_uri('GET',
-            f'//api.smugmug.com/api/v2/album/{testResponses.getItemId(albumName)}!images',
-            json=testResponses.getImagesResponse(albumName, images))
+    def traversePath(self, path):
+        node = self.remote
+        path = path.strip("/")
+        if path:
+            for p in path.split("/"):
+                if isinstance(node, dict) and p in node:
+                    node = node[p]
+                else:
+                    node = None
+                    break
+        return node
 
-    def registerGetImageCall(self, imageName):
-        self.request_mock.register_uri('GET',
-            f'//api.smugmug.com/api/v2/image/{testResponses.getItemId(imageName)}-0',
-            json=testResponses.getImageResponse(imageName))
+    def getFolderAtPath(self, nodePath):
+        node = self.traversePath(nodePath)
+        self.assertIsNotNone(node)
+        self.assertTrue(isFolder(node))
+        return node
 
-    def registerCreateFolderCall(self, path, folderName):
-        self.request_mock.register_uri('POST',
-            f'//api.smugmug.com/api/v2/folder/user/testuser{path}!folders',
-            additional_matcher= lambda r : parse_qs(r.text)["Name"][0] == folderName,
-            json=testResponses.postFolderResponse(folderName, path))
+    def findAlbumWithId(self, albumId):
+        try:
+            albumId = albumId.decode()
+        except (UnicodeDecodeError, AttributeError):
+            pass
 
-    def registerCreateAlbumCall(self, albumPath, albumName):
-        self.request_mock.register_uri('POST',
-            f'//api.smugmug.com/api/v2/folder/user/testuser{albumPath}!albums',
-            additional_matcher= lambda r : parse_qs(r.text)["Name"][0] == albumName,
-            json=testResponses.postAlbumResponse(albumName, albumPath))
+        front = deque()
+        front.append(self.remote)
 
-    def registerUploadCall(self, albumName, imageName):
-        def matcher(r):
-            return r.text.fields['upload_file'][0] == imageName and r.headers['X-Smug-AlbumUri'] == f"/api/v2/album/{testResponses.getItemId(albumName)}".encode('ascii')
-        self.request_mock.register_uri('POST',
-            '//upload.smugmug.com',
-            additional_matcher=matcher,
-            json=testResponses.uploadResponse(imageName))
+        while front:
+            node = front.popleft()
+            for name, nextNode in node.items():
+                if isAlbum(nextNode) and testResponses.getItemId(name) == albumId:
+                    return name, nextNode
+                elif isFolder(nextNode):
+                    front.append(nextNode)
+
+        return None, None
+
+    def findImageWithId(self, imageId):
+        try:
+            imageId = imageId.decode()
+        except (UnicodeDecodeError, AttributeError):
+            pass
+
+        front = deque()
+        front.append(self.remote)
+
+        while front:
+            node = front.popleft()
+            if isFolder(node):
+                for _, nextNode in node.items():
+                    front.append(nextNode)
+            elif isAlbum(node):
+                for imageName in node:
+                    if testResponses.getItemId(imageName) == imageId:
+                        return imageName
+
+        return None
+
+    def remoteHandler(self, request):
+
+        method = request.method
+        urlPath = request.path.replace("//api.smugmug.com/api/v2/", "")
+
+        m = re.search("folder/user/testuser(.*)!folders", urlPath)
+        if m:
+            nodePath = m.group(1)
+            node = self.getFolderAtPath(nodePath)
+            if method == "GET":
+                folders = [name for name, childNode in node.items() if isFolder(childNode)]
+                return self.createResponse(testResponses.getFoldersResponse(folders, nodePath))
+            elif method == "POST":
+                name = parse_qs(request.text)["Name"][0]
+                self.assertNotIn(name, node)
+                node[name.lower()] = {}
+                return self.createResponse(testResponses.postFolderResponse(name, nodePath))
+
+        m = re.search("folder/user/testuser(.*)!albums", urlPath)
+        if m:
+            nodePath = m.group(1)
+            node = self.getFolderAtPath(nodePath)
+            if method == "GET":
+                albums = [name for name, childNode in node.items() if isAlbum(childNode)]
+                return self.createResponse(testResponses.getAlbumsResponse(albums, nodePath))
+            elif method == "POST":
+                name = parse_qs(request.text)["Name"][0]
+                self.assertNotIn(name, node)
+                node[name] = []
+                return self.createResponse(testResponses.postAlbumResponse(name, nodePath))
+
+        m = re.search("album/(.+)!images", urlPath)
+        if m:
+            if method == "GET":
+                albumName, album = self.findAlbumWithId(m.group(1))
+                self.assertIsNotNone(album)
+                return self.createResponse(testResponses.getImagesResponse(albumName, album))
+
+        m = re.search("image/(.+)-0", urlPath)
+        if m:
+            if method == "GET":
+                imageName = self.findImageWithId(m.group(1))
+                self.assertIsNotNone(imageName)
+                return self.createResponse(testResponses.getImageResponse(imageName))
+
+        if request.hostname == 'upload.smugmug.com':
+            imageName = request.text.fields['upload_file'][0]
+            albumId = request.headers['X-Smug-AlbumUri'].replace(b"/api/v2/album/", b"")
+            albumName, album = self.findAlbumWithId(albumId)
+            self.assertIsNotNone(album)
+            self.assertNotIn(imageName, album)
+            album.append(imageName)
+            return self.createResponse(testResponses.uploadResponse(imageName))
+
+    def assertCallCount(self, count):
+        self.assertEqual(self.request_mock.call_count, count)
 
     def createLocalFiles(self, path, node):
 
@@ -143,60 +242,23 @@ class TestSmugler(unittest.TestCase):
 
     def testSimpleEmptyUser(self):
         smugler.main(Args("sync", self.tempDir))
-
-        print(self.request_mock.call_count)
-        print(self.request_mock.request_history)
+        self.assertCallCount(2)
 
     def testSimpleUpload(self):
         self.createLocalFiles(self.tempDir, { "Album1": ["File1.jpg"]})
-
-        self.registerGetFoldersCall([], "")
-        self.registerGetAlbumsCall([], "")
-        self.registerCreateAlbumCall("", "Album1")
-        self.registerUploadCall("Album1", "File1.jpg")
-        self.registerGetImageCall("File1.jpg")
-
         smugler.main(Args("sync", self.tempDir))
 
     def testMultipleUpload(self):
         self.createLocalFiles(self.tempDir, { "Album1": ["File1.jpg", "File2.jpg"], "Album2": ["File3.jpg", "File4,jpg"]})
-
-        self.registerGetFoldersCall([], "")
-        self.registerGetAlbumsCall([], "")
-        self.registerCreateAlbumCall("", "Album1")
-        self.registerCreateAlbumCall("", "Album2")
-        self.registerUploadCall("Album1", "File1.jpg")
-        self.registerUploadCall("Album1", "File2.jpg")
-        self.registerUploadCall("Album2", "File3.jpg")
-        self.registerUploadCall("Album2", "File4.jpg")
-        self.registerGetImageCall("File1.jpg")
-        self.registerGetImageCall("File2.jpg")
-        self.registerGetImageCall("File3.jpg")
-        self.registerGetImageCall("File4.jpg")
-
         smugler.main(Args("sync", self.tempDir))
 
     def testWithFolder(self):
         self.createLocalFiles(self.tempDir, { "Folder1": {"Album1": ["File1.jpg", "File2.jpg"]}})
-
-        self.registerGetFoldersCall([], "")
-        self.registerGetAlbumsCall([], "")
-        self.registerCreateFolderCall("", "Folder1")
-        self.registerCreateAlbumCall("/Folder1", "Album1")
-        self.registerUploadCall("Album1", "File1.jpg")
-        self.registerUploadCall("Album1", "File2.jpg")
-        self.registerGetImageCall("File1.jpg")
-        self.registerGetImageCall("File2.jpg")
-
         smugler.main(Args("sync", self.tempDir))
 
     def testSimpleNoUpload(self):
         self.createLocalFiles(self.tempDir, { "Album1": ["File1.jpg"]})
-
-        self.registerGetFoldersCall([], "")
-        self.registerGetAlbumsCall(["Album1"], "")
-        self.registerGetImagesCall("Album1", ["File1.jpg"])
-
+        self.remote = { "Album1": ["File1.jpg"]}
         smugler.main(Args("sync", self.tempDir))
 
 if __name__ == '__main__':
