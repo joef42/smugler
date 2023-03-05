@@ -10,6 +10,7 @@ import re
 import requests
 import json
 from collections import deque
+import shutil
 
 import unittest
 import requests_mock
@@ -211,6 +212,20 @@ class TestSmugler(unittest.TestCase):
                 self.assertIsNotNone(imageName)
                 return self.createResponse(testResponses.getImageResponse(imageName))
 
+        m = re.search("folder/user/testuser/(.*)", urlPath)
+        if m:
+            nodePath = m.group(1).split("/")
+            folderName = nodePath[-1]
+            pathName = "/".join(nodePath[:-1])
+            for k, v in self.getFolderAtPath(pathName).items():
+                if isFolder(v) and k.lower() == folderName.lower():
+                    realfolderName = k
+                    break
+            else:
+                self.fail("Folder not found")
+            if method == "GET":
+                return self.createResponse(testResponses.getFolderResponse(realfolderName, pathName))
+                
         if request.hostname == 'upload.smugmug.com':
             imageName = request.text.fields['upload_file'][0]
             albumId = request.headers['X-Smug-AlbumUri'].replace(b"/api/v2/album/", b"")
@@ -223,6 +238,27 @@ class TestSmugler(unittest.TestCase):
     def assertCallCount(self, count):
         self.assertEqual(self.request_mock.call_count, count)
 
+    def assertUploadCount(self, expectedCount):
+        actualCount = 0
+        for r in self.request_mock.request_history:
+            if r.hostname == "upload.smugmug.com":
+                actualCount += 1
+        self.assertEqual(expectedCount, actualCount)
+
+    def assertPostCount(self, expectedCount):
+        actualCount = 0
+        for r in self.request_mock.request_history:
+            if r.method == "POST" and not r.hostname == "upload.smugmug.com":
+                actualCount += 1
+        self.assertEqual(expectedCount, actualCount)
+
+
+    def clearLocalFiles(self, path):
+        for d in os.listdir(path):
+            fullPath = os.path.join(path, d)
+            if os.path.isdir(fullPath):
+                shutil.rmtree(fullPath)
+    
     def createLocalFiles(self, path, node):
         def recur(path, node):
             if isinstance(node, dict):
@@ -275,6 +311,8 @@ class TestSmugler(unittest.TestCase):
         smugler.main(Args("sync", self.tempDir))
 
         self.assertLocalEqRemote()
+        self.assertUploadCount(1)
+        self.assertPostCount(1)
 
     def repeatStateIterations(self, iterations):
         for localState, expectedState in iterations:
@@ -310,6 +348,8 @@ class TestSmugler(unittest.TestCase):
         smugler.main(Args("sync", self.tempDir))
 
         self.assertLocalEqRemote()
+        self.assertUploadCount(4)
+        self.assertPostCount(2)
 
     def testWithFolder(self):
         self.createLocalFiles(self.tempDir, { "Folder1": {"Album1": ["File1.jpg", "File2.jpg"]}})
@@ -317,6 +357,8 @@ class TestSmugler(unittest.TestCase):
         smugler.main(Args("sync", self.tempDir))
 
         self.assertLocalEqRemote()
+        self.assertUploadCount(2)
+        self.assertPostCount(2)
 
     def testComplexStructure(self):
         self.createLocalFiles(self.tempDir, {
@@ -331,6 +373,8 @@ class TestSmugler(unittest.TestCase):
         smugler.main(Args("sync", self.tempDir))
 
         self.assertLocalEqRemote()
+        self.assertUploadCount(5)
+        self.assertPostCount(5)
 
     def testIgnoredFolders(self):
         self.createLocalFiles(self.tempDir, {
@@ -349,6 +393,8 @@ class TestSmugler(unittest.TestCase):
 
         del self.local["_NoFolder2"]
         self.assertLocalEqRemote()
+        self.assertUploadCount(4)
+        self.assertPostCount(3)
 
     def testIgnoredAlbum(self):
         self.createLocalFiles(self.tempDir, {
@@ -362,6 +408,8 @@ class TestSmugler(unittest.TestCase):
         smugler.main(Args("sync", self.tempDir))
         self.local = {}
         self.assertLocalEqRemote()
+        self.assertUploadCount(0)
+        self.assertPostCount(0)
 
     def testEmptyFolder(self):
         self.createLocalFiles(self.tempDir, {
@@ -374,6 +422,8 @@ class TestSmugler(unittest.TestCase):
         smugler.main(Args("sync", self.tempDir))
         self.local = {}
         self.assertLocalEqRemote()
+        self.assertUploadCount(0)
+        self.assertPostCount(0)
 
     def testSimpleNoUpload(self):
         self.createLocalFiles(self.tempDir, {"Album1": ["File1.jpg"]})
@@ -382,6 +432,33 @@ class TestSmugler(unittest.TestCase):
         smugler.main(Args("sync", self.tempDir))
 
         self.assertLocalEqRemote()
+        self.assertUploadCount(0)
+        self.assertPostCount(0)
+
+    def testSimpleNoUploadWithFolder(self):
+        self.createLocalFiles(self.tempDir, {"Folder1": {"Album1": ["File1.jpg"]}})
+        self.remote = {"Folder1": {"Album1": ["File1.jpg"]}}
+
+        smugler.main(Args("sync", self.tempDir))
+
+        self.assertLocalEqRemote()
+
+    def testSimpleNoUploadAfterLocalAnRemoteRename(self):
+        self.createLocalFiles(self.tempDir, {"Folder1": {"Album1": ["File1.jpg"]}})
+        self.remote = {"Folder1": {"Album1": ["File1.jpg"]}}
+
+        smugler.main(Args("sync", self.tempDir))
+
+        self.clearLocalFiles(self.tempDir)
+        self.createLocalFiles(self.tempDir, {"Folder2": {"Album2": ["File1.jpg"]}})
+        self.remote = {"Folder2": {"Album2": ["File1.jpg"]}}
+
+        smugler.main(Args("sync", self.tempDir))
+
+        self.assertLocalEqRemote()
+        self.assertUploadCount(0)
+        self.assertPostCount(0)
+
 
 if __name__ == '__main__':
     unittest.main()

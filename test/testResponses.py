@@ -47,6 +47,19 @@ def getFoldersResponse(folders, path):
                 "Message": "Ok"
             }
 
+def getFolderResponse(folderName, path):
+    return {
+        "Response": {
+            "Uri": f"/api/v2/folder/user/testuser/{path}",
+            "Locator": "Folder",
+            "LocatorType": "Objects",
+            "Folder": folderItem(folderName, path)
+        },
+        "Code": 200,
+        "Message": "Ok"
+        }
+
+
 def postFolderResponse(folderName, path):
     return {
         "Response": {
@@ -55,7 +68,7 @@ def postFolderResponse(folderName, path):
             "LocatorType": "Objects",
             "Folder": folderItem(folderName, path)
         },
-        "Code": 200,
+        "Code": 201,
         "Message": "Created"
         }
 
