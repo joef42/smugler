@@ -1,5 +1,5 @@
 # smugler
-Uploads pictures/videos to Smugmug reflecting the local folder structures with folers/albums in Smugmug.
+Uploads pictures/videos to Smugmug reflecting the local folder structures with folders/albums in Smugmug.
 
 ## Installation
 
