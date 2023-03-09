@@ -32,26 +32,6 @@ class SmugMugException(Exception):
     def __repr__(self):
         return "SmugMugExcpetion " + repr(self.errCode) + ": " + repr(self.errMsg)
 
-class SmugMugResponse():
-    def __init__(self, jsonResp):
-        super().__init__()
-        self._json = jsonResp
-
-    def __repr__(self):
-        return "SmugMugResponse:\n" + self.__dump()
-
-    def __dump(self):
-        return json.dumps(self._json, indent=2)
-
-    def get(self, path):
-        ret = self._json
-        for p in path:
-            if p in ret:
-                ret = ret[p]
-            else:
-                raise KeyError("Path %s not found in json:/n%s" % ("/".join(path), self.__dump()))
-        return ret
-
 def extractUri(uri):
     if "Uri" in uri:
         return uri["Uri"]
@@ -123,13 +103,6 @@ class Album():
                     self._images.append(Image(img))
 
         logging.info("%s has %d images", self._resp["Name"], len(self._images))
-
-
-    def getImageByFileName(self, fileName):
-        for img in self._images:
-            if img.getFileName() == fileName:
-                return img
-        return None
 
     def hasImage(self, path):
         if not self._filenameCache:

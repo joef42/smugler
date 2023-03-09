@@ -123,58 +123,6 @@ def upload(path: Path, root):
         else:
             break
 
-# def scanRecursive(path, nodeName, parent):
-
-#     filesToUpload = []
-#     folders = []
-
-#     def scanMissing():
-#         filesToUpload.clear()
-#         folders.clear()
-#         for p in path.iterdir():
-#             if supportedFileFormat(p) and (not node or not node.getImageByFileName(p.name)):
-#                 filesToUpload.append(p)
-#             elif p.is_dir() and not p.name.startswith("_"):
-#                 folders.append(p)
-#         return len(filesToUpload) > 0 or len(folders) > 0
-
-#     if nodeName:
-#         node = parent.getChildrenByName(nodeName)
-#         #if not node and scanMissing():
-#         #    # TODO: Selectively reload only this children and not whole parent
-#         #    parent.reload(incremental=True)
-#         #    node = parent.getChildrenByUrlName(nodeName)
-
-#     else:
-#         node = parent
-
-#     scanMissing()
-
-#     if (not node and filesToUpload) or (node and node.isAlbum()):
-#         if filesToUpload:
-#             if not node:
-#                 node = parent.createAlbum(path.name)
-#             else:
-#                 # TODO: Only reload if different Date Modified
-#                 node.reload()
-
-#             filesToUpload = [f for f in filesToUpload if not node.getImageByFileName(f.name)]
-
-#             if filesToUpload:
-#                 uploadFiles(node, filesToUpload)
-#                 node.reload()
-#         for f in folders:
-#             logging.warning("Ignored folder: %s", f)
-#     elif folders:
-#         if not node:
-#             node = parent.createFolder(path.name)
-#         else:
-#             node.reload(incremental=True)
-#         for f in folders:
-#             scanRecursive(f, f.name, node)
-#         for f in filesToUpload:
-#             logging.warning("Ignored images: %s", f)
-
 def scanRemoteRecursive(path, parent):
     if not parent.isAlbum():
         for c in parent.getChildren():
