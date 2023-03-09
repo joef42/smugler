@@ -42,7 +42,7 @@ def uploadFiles(node, files):
         try:
             node.upload(f)
             failCount = 0
-        except Exception as e:
+        except Exception as e: #pylint: disable=W0718
             logging.exception("Failed to upload %r", e)
             failCount += 1
             if failCount >= 5:
@@ -214,12 +214,12 @@ if __name__ == "__main__":
     parser.add_argument('imagePath', type=str, help='Path to local gallery')
     parser.add_argument('--refresh', action='store_true', help='Refresh status from Smugmug')
     parser.add_argument('--debug', action='store_true', help='Print additional debug trace')
-    args = parser.parse_args()
+    parsedArgs = parser.parse_args()
 
     def run():
-        main(args)
+        main(parsedArgs)
 
-    if args.debug:
+    if parsedArgs.debug:
         import cProfile
         cProfile.run('run()', sort='cumulative')
     else:

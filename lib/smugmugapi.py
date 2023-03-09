@@ -85,10 +85,10 @@ class Album():
         if not lazy:
             self.reloadChildren()
         else:
-            logging.debug(f"Lazy load Album {self.getName()}")
+            logging.debug("Lazy load Album %s", self.getName())
 
     def reload(self):
-        logging.info(f"Reload of Album {self.getName()}")
+        logging.info("Reload of Album %s", self.getName())
         self._load(lazy=False)
 
     def reloadChildren(self):
@@ -184,7 +184,7 @@ class Folder():
 
             oldChildrenMap = dict()
             if incremental:
-                logging.info(f"Incremental load Folder {self.getName()}")
+                logging.info("Incremental load Folder %s", self.getName())
                 for c in self._children:
                     oldChildrenMap[getNameId(c._resp)] = c
 
@@ -219,11 +219,11 @@ class Folder():
                             self._children.append(oldChildrenMap[nameId])
 
         else:
-            logging.debug(f"Lazy load Folder {self.getName()}")
+            logging.debug("Lazy load Folder %s", self.getName())
 
 
     def reload(self, incremental=False):
-        logging.info(f"Reload of {self.getName()}")
+        logging.info("Reload of %s", self.getName())
         self._load(lazy=False, incremental=incremental)
 
     def getChildrenByUrlName(self, name):
