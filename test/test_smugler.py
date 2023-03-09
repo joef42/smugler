@@ -208,6 +208,13 @@ class TestSmugler(unittest.TestCase):
                 self.assertIsNotNone(album)
                 return self.createResponse(testResponses.getImagesResponse(albumName, album))
 
+        m = re.search("album/(.+)", urlPath)
+        if m:
+            if method == "GET":
+                albumName, album = self.findAlbumWithId(m.group(1))
+                self.assertIsNotNone(album)
+                return self.createResponse(testResponses.getAlbumResponse(albumName))
+
         m = re.search("image/(.+)-0", urlPath)
         if m:
             if method == "GET":
@@ -488,6 +495,16 @@ class TestSmugler(unittest.TestCase):
 
         with pytest.raises(Exception):
             smugler.main(Args("sync", self.tempDir))
+
+    def NO_testScanRemoteWithDelete(self):
+
+        self.createLocalFiles(self.tempDir, {"Folder1": {"Album1": ["File1.jpg"]}})
+        self.remote = {"Folder1": {"Album1": ["File1.jpg", "File2.jpg"]}}
+
+        smugler.main(Args("syncRemote", self.tempDir, refresh=True))
+
+        self.assertLocalEqRemote()
+
 
 
 if __name__ == '__main__':

@@ -150,6 +150,18 @@ def getAlbumsResponse(albums, path):
         "Message": "Ok"
         }
 
+def getAlbumResponse(albumName):
+    return {
+        "Response": {
+            "Uri": f"/api/v2/folder/user/testuser/{getItemId(albumName)}",
+            "Locator": "Album",
+            "LocatorType": "Objects",
+            "Album": albumItem(albumName, "")
+        },
+        "Code": 200,
+        "Message": "Ok"
+        }
+
 def postAlbumResponse(albumName, path):
     return {
         "Response": {

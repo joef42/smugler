@@ -6,7 +6,6 @@ import logging
 from pathlib import Path
 import datetime
 import time
-import sys
 import pickle
 import yaml
 import argparse
@@ -132,27 +131,18 @@ def scanRemoteRecursive(path, parent):
             else:
                 logging.error("Ignoring folder not found on disk: %r", subPath)
     else:
-        for i in range(2):
-            seenSet = set()
-            delList = []
-            for p in parent.getImages():
-                imgPath = path / p.getFileName()
-                if not imgPath.exists():
-                    if i==0:
-                        parent.reload()
-                        break
-                    logging.info("Delete missing  : %s", imgPath)
-                    delList.append(p)
-                elif imgPath in seenSet:
-                    if i==0:
-                        parent.reload()
-                        break
-                    logging.info("Delete duplicate: %s", imgPath)
-                    delList.append(p)
-                else:
-                    seenSet.add(imgPath)
+        seenSet = set()
+        delList = []
+        for p in parent.getImages():
+            imgPath = path / p.getFileName()
+            if not imgPath.exists():
+                logging.info("Delete missing  : %s", imgPath)
+                delList.append(p)
+            elif imgPath in seenSet:
+                logging.info("Delete duplicate: %s", imgPath)
+                delList.append(p)
             else:
-                break
+                seenSet.add(imgPath)
 
         if delList:
             logging.info("Delete %d images in %s? [y/n]", len(delList), parent.getName())
@@ -202,10 +192,12 @@ def main(args):
     SmugMug(imageDir / ".smugmugToken", config)
 
     rootFolder = None
-    if not args.refresh:
+    if args.refresh:
+        rootFolder = Folder(lazy=False)
+    else:
         rootFolder = loadContentFromFile(imageDir)
-    if not rootFolder:
-        rootFolder = Folder(lazy=True)
+        if not rootFolder:
+            rootFolder = Folder(lazy=True)
 
     try:
         if args.action == "sync":
@@ -218,7 +210,7 @@ def main(args):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Sync folder to Smugmug')
-    parser.add_argument('action', type=str, choices=["sync", "syncRemote"], help='sync: Upload images to Smugmug\nsyncRemote: Remove images from Smugmug not found locally')
+    parser.add_argument('action', type=str, choices=["sync"], help='sync: Upload images to Smugmug')
     parser.add_argument('imagePath', type=str, help='Path to local gallery')
     parser.add_argument('--refresh', action='store_true', help='Refresh status from Smugmug')
     parser.add_argument('--debug', action='store_true', help='Print additional debug trace')
