@@ -8,7 +8,8 @@ Uploads pictures/videos to Smugmug reflecting the local folder structures with f
 * ```pip install -r requirements.txt```
 
 ## Usage
-```usage: smugler.py [-h] [--refresh] [--debug] {sync} imagePath
+```
+usage: smugler.py [-h] [--refresh] [--debug] {sync} imagePath
 
 Sync folder to Smugmug
 
@@ -19,4 +20,5 @@ positional arguments:
 optional arguments:
   -h, --help  show this help message and exit
   --refresh   Refresh status from Smugmug
-  --debug     Print additional debug trace```
+  --debug     Print additional debug trace
+  ```
