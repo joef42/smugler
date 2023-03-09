@@ -3,7 +3,9 @@ Uploads pictures/videos to Smugmug reflecting the local folder structures with f
 
 ## Installation
 
-```pip install -r requirements.txt```
+* Get API key and secret from https://api.smugmug.com/api/v2/doc/tutorial/api-key.html
+* Create smuglerconf.yaml from example and insert API key and secret
+* ```pip install -r requirements.txt```
 
 ## Usage
 ```usage: smugler.py [-h] [--refresh] [--debug] {sync} imagePath
