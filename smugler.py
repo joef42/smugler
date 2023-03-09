@@ -38,22 +38,17 @@ def error_callback(error):
     logging.error("Job returned error: %r", error)
 
 def uploadFiles(node, files):
+    failCount = 0
     for f in files:
-        retryCount = 0
-        while retryCount < 3:
-            time.sleep(retryCount * 5)
-            retryCount += 1
-            try:
-                node.upload(f)
-                break
-            except ConnectionError:
-                logging.exception("Failed to upload %r", f)
-                node.reload()
-                if node.hasImage(f):
-                    logging.info("Still uploaded successfully")
-                    break
-        else:
-            logging.error("Giving up after 3 retries")
+        try:
+            node.upload(f)
+            failCount = 0
+        except Exception as e:
+            logging.exception("Failed to upload %r", e)
+            failCount += 1
+            if failCount >= 5:
+                logging.error("Too many failed uploads, giving up.")
+                raise
 
 def scanNewFiles(path: Path, parent):
 
@@ -116,14 +111,17 @@ def uploadChanges(path: Path, changes, parent):
 
 def upload(path: Path, root):
 
-    changes = scanNewFiles(path, root)
+    for _ in range(3):
 
-    if changes:
-
-        refreshFromRemote(changes, root)
         changes = scanNewFiles(path, root)
 
-        uploadChanges(path, changes, root)
+        if changes:
+
+            refreshFromRemote(changes, root)
+            changes = scanNewFiles(path, root)
+            uploadChanges(path, changes, root)
+        else:
+            break
 
 # def scanRecursive(path, nodeName, parent):
 

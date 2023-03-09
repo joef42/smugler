@@ -11,6 +11,7 @@ import requests
 import json
 from collections import deque
 import shutil
+import pytest
 
 import unittest
 import requests_mock
@@ -42,6 +43,8 @@ class TestSmugler(unittest.TestCase):
         self.createToken()
 
         self.remote = {}
+
+        self.uploadFail = {}
 
         self.registerUserBaseCalls()
         self.request_mock.add_matcher(self.remoteHandler)
@@ -225,15 +228,23 @@ class TestSmugler(unittest.TestCase):
                 self.fail("Folder not found")
             if method == "GET":
                 return self.createResponse(testResponses.getFolderResponse(realfolderName, pathName))
-                
+
         if request.hostname == 'upload.smugmug.com':
             imageName = request.text.fields['upload_file'][0]
             albumId = request.headers['X-Smug-AlbumUri'].replace(b"/api/v2/album/", b"")
             albumName, album = self.findAlbumWithId(albumId)
             self.assertIsNotNone(album)
             self.assertNotIn(imageName, album)
-            album.append(imageName)
-            return self.createResponse(testResponses.uploadResponse(imageName))
+
+            if imageName in self.uploadFail:
+                if self.uploadFail[imageName]:
+                    album.append(imageName)
+                del self.uploadFail[imageName]
+                return self.createResponse("", 503)
+
+            else:
+                album.append(imageName)
+                return self.createResponse(testResponses.uploadResponse(imageName))
 
     def assertCallCount(self, count):
         self.assertEqual(self.request_mock.call_count, count)
@@ -258,7 +269,7 @@ class TestSmugler(unittest.TestCase):
             fullPath = os.path.join(path, d)
             if os.path.isdir(fullPath):
                 shutil.rmtree(fullPath)
-    
+
     def createLocalFiles(self, path, node):
         def recur(path, node):
             if isinstance(node, dict):
@@ -458,6 +469,25 @@ class TestSmugler(unittest.TestCase):
         self.assertLocalEqRemote()
         self.assertUploadCount(0)
         self.assertPostCount(0)
+
+    def testFailingUpload(self):
+        self.createLocalFiles(self.tempDir, {"Folder1": {"Album1": ["File1.jpg", "File2.jpg", "File3.jpg", "File4.jpg"]}})
+
+        self.uploadFail["File2.jpg"] = False
+        self.uploadFail["File4.jpg"] = True
+
+        smugler.main(Args("sync", self.tempDir))
+
+        self.assertLocalEqRemote()
+        self.assertUploadCount(5)
+
+    def testFailingUploadGiveUp(self):
+        self.createLocalFiles(self.tempDir, {"Folder1": {"Album1": ["File1.jpg", "File2.jpg", "File3.jpg", "File4.jpg", "File5.jpg"]}})
+
+        self.uploadFail = {"File1.jpg": False, "File2.jpg": False, "File3.jpg": False, "File4.jpg": False, "File5.jpg": False}
+
+        with pytest.raises(Exception):
+            smugler.main(Args("sync", self.tempDir))
 
 
 if __name__ == '__main__':
