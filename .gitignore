@@ -1,2 +1,3 @@
 smuglerconf.yaml
 *.pyc
+.vscode/launch.json
