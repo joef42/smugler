@@ -76,6 +76,14 @@ def scanNewFiles(path: Path, parent):
     else:
         return None
 
+def refreshPattern(parent, pattern):
+
+    if parent.getName() == pattern:
+        parent.reload()
+    elif not parent.isAlbum():
+        for child in parent.getChildren():
+            refreshPattern(child, pattern)
+
 def refreshFromRemote(changes, parent):
 
     if isinstance(changes, dict):
@@ -191,13 +199,14 @@ def main(args):
 
     SmugMug(imageDir / ".smugmugToken", config)
 
-    rootFolder = None
-    if args.refresh:
+    rootFolder = loadContentFromFile(imageDir)
+    if not rootFolder:
+        rootFolder = Folder(lazy=True)
+    
+    if args.refresh == "*":
         rootFolder = Folder(lazy=False)
-    else:
-        rootFolder = loadContentFromFile(imageDir)
-        if not rootFolder:
-            rootFolder = Folder(lazy=True)
+    elif args.refresh:
+        refreshPattern(rootFolder, args.refresh)        
 
     try:
         if args.action == "sync":
@@ -212,7 +221,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Sync folder to Smugmug')
     parser.add_argument('action', type=str, choices=["sync"], help='sync: Upload images to Smugmug')
     parser.add_argument('imagePath', type=str, help='Path to local gallery')
-    parser.add_argument('--refresh', action='store_true', help='Refresh status from Smugmug')
+    parser.add_argument('--refresh', type=str, help='Refresh Folders/Albums with the given name from Smugmug. * for everything.')
     parser.add_argument('--debug', action='store_true', help='Print additional debug trace')
     parsedArgs = parser.parse_args()
 
