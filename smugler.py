@@ -219,8 +219,8 @@ def main(args):
     try:
         if args.action == "sync":
             upload(imageDir, rootFolder)
-        elif args.action == "syncRemote":
-            scanRemoteRecursive(imageDir, rootFolder)
+        #elif args.action == "syncRemote":
+        #    scanRemoteRecursive(imageDir, rootFolder)
     finally:
         saveContentToFile(imageDir, rootFolder)
 
