@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 #pylint: disable=C,R
 
-from lib.smugmugapi import SmugMug, Folder
+from lib.smugmugapi import SmugMug, Folder, SmugMugException
 import logging
 from pathlib import Path
 import datetime
@@ -81,9 +81,17 @@ def refreshPattern(parent, pattern):
     if parent.getName() == pattern:
         parent.reload()
     elif not parent.isAlbum():
-        for child in parent.getChildren():
-            refreshPattern(child, pattern)
+        childrenToDelete = []
+        for child in parent.getChildren()[:]:
+            try:
+                refreshPattern(child, pattern)
+            except SmugMugException as e:
+                if e.errCode == 404:
+                    childrenToDelete.append(child)
 
+        for childToDel in childrenToDelete:
+            parent.getChildren().remove(childToDel)
+                    
 def refreshFromRemote(changes, parent):
 
     if isinstance(changes, dict):
@@ -211,8 +219,8 @@ def main(args):
     try:
         if args.action == "sync":
             upload(imageDir, rootFolder)
-        elif args.action == "syncRemote":
-            scanRemoteRecursive(imageDir, rootFolder)
+        #elif args.action == "syncRemote":
+        #    scanRemoteRecursive(imageDir, rootFolder)
     finally:
         saveContentToFile(imageDir, rootFolder)
 

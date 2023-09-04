@@ -205,14 +205,15 @@ class TestSmugler(unittest.TestCase):
         if m:
             if method == "GET":
                 albumName, album = self.findAlbumWithId(m.group(1))
-                self.assertIsNotNone(album)
+                
                 return self.createResponse(testResponses.getImagesResponse(albumName, album))
 
         m = re.search("album/(.+)", urlPath)
         if m:
             if method == "GET":
                 albumName, album = self.findAlbumWithId(m.group(1))
-                self.assertIsNotNone(album)
+                if not album:
+                    return self.createErrorResponse(404)
                 return self.createResponse(testResponses.getAlbumResponse(albumName))
 
         m = re.search("image/(.+)-0", urlPath)
@@ -232,7 +233,7 @@ class TestSmugler(unittest.TestCase):
                     realfolderName = k
                     break
             else:
-                self.fail("Folder not found")
+                return self.createErrorResponse(404)
             if method == "GET":
                 return self.createResponse(testResponses.getFolderResponse(realfolderName, pathName))
 
@@ -247,7 +248,7 @@ class TestSmugler(unittest.TestCase):
                 if self.uploadFail[imageName]:
                     album.append(imageName)
                 del self.uploadFail[imageName]
-                return self.createResponse("", 503)
+                return self.createErrorResponse(503)
 
             else:
                 album.append(imageName)
@@ -531,12 +532,16 @@ class TestSmugler(unittest.TestCase):
         del self.remote["Folder2"]["Album2_1"][0]
         del self.remote["Folder3"]
 
+        smugler.main(Args("sync", self.tempDir))
+
+        self.assertUploadCount(0)
+        self.assertPostCount(0)
+
         smugler.main(Args("sync", self.tempDir, refresh="*"))
 
         self.assertUploadCount(5)
         self.assertPostCount(3)
         self.assertLocalEqRemote()
-    
     
     def testRemoteRefreshPattern(self):
         self.createLocalFiles(self.tempDir, self.getTestStructure())
@@ -551,11 +556,6 @@ class TestSmugler(unittest.TestCase):
         del self.remote["Folder1"]["Album1_1"]
         del self.remote["Folder2"]["Album2_1"][0]
 
-        smugler.main(Args("sync", self.tempDir))
-
-        self.assertUploadCount(0)
-        self.assertPostCount(0)
-
         smugler.main(Args("sync", self.tempDir, refresh="Album2_1"))
 
         self.assertUploadCount(1)
@@ -566,21 +566,52 @@ class TestSmugler(unittest.TestCase):
         self.assertUploadCount(3)
         self.assertPostCount(1)
 
-        # TODO: Test refresh with deleted folder
-        #del self.remote["Folder3"]
+    def testRemoteRefreshPatternOnDeletedFolder(self):
+        self.createLocalFiles(self.tempDir, self.getTestStructure())
+        self.remote = self.getTestStructure()
+        
+        smugler.main(Args("sync", self.tempDir))
 
-        #smugler.main(Args("sync", self.tempDir))
+        self.assertLocalEqRemote()
+        self.assertUploadCount(0)
+        self.assertPostCount(0)
 
-        #self.assertUploadCount(3)
-        #self.assertPostCount(1)
+        del self.remote["Folder3"]
 
-        #smugler.main(Args("sync", self.tempDir, refresh="Folder3"))
+        smugler.main(Args("sync", self.tempDir))
 
-        #self.assertUploadCount(5)
-        #self.assertPostCount(3)
+        self.assertUploadCount(0)
+        self.assertPostCount(0)
+
+        smugler.main(Args("sync", self.tempDir, refresh="Folder3"))
+
+        self.assertUploadCount(2)
+        self.assertPostCount(2)
 
         self.assertLocalEqRemote()
 
+
+    def testRemoteRefreshPatternOnDeletedAlbum(self):
+        self.createLocalFiles(self.tempDir, self.getTestStructure())
+        self.remote = self.getTestStructure()
+        
+        smugler.main(Args("sync", self.tempDir))
+
+        self.assertLocalEqRemote()
+        self.assertUploadCount(0)
+        self.assertPostCount(0)
+
+        del self.remote["Folder1"]["Album1_1"]
+
+        smugler.main(Args("sync", self.tempDir))
+
+        self.assertUploadCount(0)
+        self.assertPostCount(0)
+
+        smugler.main(Args("sync", self.tempDir, refresh="Album1_1"))
+
+        self.assertUploadCount(2)
+        self.assertPostCount(1)
 
     def NO_testScanRemoteWithDelete(self):
 
