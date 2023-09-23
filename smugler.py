@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-#pylint: disable=C,R
+#pylint: disable=C,R,W1203
 
 from lib.smugmugapi import SmugMug, Folder, SmugMugException
 import logging
@@ -79,6 +79,7 @@ def scanNewFiles(path: Path, parent):
 def refreshPattern(parent, pattern):
 
     if parent.getName() == pattern:
+        logging.info(f"Reload {parent.getName()}")
         parent.reload()
     elif not parent.isAlbum():
         childrenToDelete = []
@@ -121,10 +122,12 @@ def uploadChanges(path: Path, changes, parent):
             uploadChanges(subPath, subItems, node)
 
     elif isinstance(changes, list):
-
+        logging.info(f"Uploading {len(changes)} files into {parent.getName()}")
         uploadFiles(parent, changes)
 
 def upload(path: Path, root):
+
+    logging.info("Scanning for new files to upload")
 
     for _ in range(3):
 

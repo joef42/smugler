@@ -88,7 +88,7 @@ class Album():
             logging.debug("Lazy load Album %s", self.getName())
 
     def reload(self):
-        logging.info("Reload of Album %s", self.getName())
+        logging.debug("Reload of Album %s", self.getName())
         self._load(lazy=False)
 
     def reloadChildren(self):
@@ -102,7 +102,7 @@ class Album():
                 for img in resp["AlbumImage"]:
                     self._images.append(Image(img))
 
-        logging.info("%s has %d images", self._resp["Name"], len(self._images))
+        logging.debug("%s has %d images", self._resp["Name"], len(self._images))
 
     def hasImage(self, path):
         if not self._filenameCache:
@@ -134,7 +134,7 @@ class Album():
         logging.info("Uploading %s (%s) into %s", path.name, sizeFormat(path.stat().st_size), self._resp["Name"])
         resp = CurrentSmugMugApi.upload(self._resp["Uri"], path)
         elapsed_time = time.time() - start_time
-        logging.info("Uploading %s finished. It took (%d s).", path.name, elapsed_time)
+        logging.info("Uploading %s finished after %ds.", path.name, elapsed_time)
 
         if resp:
             self._filenameCache.clear()
@@ -184,7 +184,7 @@ class Folder():
 
             oldChildrenMap = dict()
             if incremental:
-                logging.info("Incremental load Folder %s", self.getName())
+                logging.debug("Incremental load Folder %s", self.getName())
                 for c in self._children:
                     oldChildrenMap[getNameId(c._resp)] = c
 
@@ -223,7 +223,7 @@ class Folder():
 
 
     def reload(self, incremental=False):
-        logging.info("Reload of %s", self.getName())
+        logging.debug("Reload of %s", self.getName())
         self._load(lazy=False, incremental=incremental)
 
     def getChildrenByUrlName(self, name):
