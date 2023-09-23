@@ -69,9 +69,9 @@ class Album():
     def __init__(self, resp, lazy=True):
         super().__init__()
         self._filenameCache = dict()
-        self._load(resp, lazy)
+        self.__load(resp, lazy)
 
-    def _load(self, resp=None, lazy=True):
+    def __load(self, resp=None, lazy=True):
         if resp:
             self._resp = resp
         else:
@@ -83,15 +83,15 @@ class Album():
         self._filenameCache.clear()
 
         if not lazy:
-            self.reloadChildren()
+            self.__reloadChildren()
         else:
             logging.debug("Lazy load Album %s", self.getName())
 
     def reload(self):
         logging.debug("Reload of Album %s", self.getName())
-        self._load(lazy=False)
+        self.__load(lazy=False)
 
-    def reloadChildren(self):
+    def __reloadChildren(self):
         pagedResp = CurrentSmugMugApi._get(extractUri(self._resp["Uris"]["AlbumImages"]),
             dataFilter=["FileName"],
             paged=True)
@@ -159,9 +159,9 @@ class Folder():
     def __init__(self, resp=None, lazy=True):
         super().__init__()
         self._children = []
-        self._load(resp, lazy)
+        self.__load(resp, lazy)
 
-    def _load(self, resp=None, lazy=True, incremental=False):
+    def __load(self, resp=None, lazy=True, incremental=False):
 
         if resp:
             self._resp = resp
@@ -224,7 +224,7 @@ class Folder():
 
     def reload(self, incremental=False):
         logging.debug("Reload of %s", self.getName())
-        self._load(lazy=False, incremental=incremental)
+        self.__load(lazy=False, incremental=incremental)
 
     def getChildrenByUrlName(self, name):
         for c in self._children:
