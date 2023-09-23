@@ -105,7 +105,7 @@ def refreshFromRemote(changes, parent):
 
     elif isinstance(changes, list):
 
-        parent.reloadChildren()
+        parent.reload()
 
 def uploadChanges(path: Path, changes, parent):
 
