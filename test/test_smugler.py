@@ -12,6 +12,7 @@ import json
 from collections import deque
 import shutil
 import pytest
+from pathlib import Path
 
 import unittest
 import requests_mock
@@ -19,6 +20,7 @@ import requests_mock
 from test import testResponses
 
 import smugler
+from lib.smugmugapi import SmugMug, Folder, SmugMugException
 
 def isFolder(node):
     return isinstance(node, dict)
@@ -60,13 +62,17 @@ class TestSmugler(unittest.TestCase):
         with open(os.path.join(self.tempDir, "smuglerconf.yaml"), "w", encoding="utf-8") as fp:
             yaml.dump(content, fp)
 
+        self.config = content
+
     def createToken(self):
 
         token = {}
         token['oauth_token'] = 'dummy_oauth_token'
         token['oauth_token_secret'] = 'dummy_oauth_token_secret'
 
-        with open(os.path.join(self.tempDir, ".smugmugToken"), "wb") as fp:
+        self.tokenFile = Path(os.path.join(self.tempDir, ".smugmugToken"))
+
+        with open(self.tokenFile, "wb") as fp:
             pickle.dump(token, fp)
 
     def registerUserBaseCalls(self):
@@ -612,6 +618,21 @@ class TestSmugler(unittest.TestCase):
 
         self.assertUploadCount(2)
         self.assertPostCount(1)
+
+    def testApiReloadFolder(self):
+
+        self.remote = self.getTestStructure()
+
+        SmugMug(self.tokenFile, self.config)
+
+        rootFolder = Folder(lazy=True)
+        rootFolder.reload()
+        
+        folder = rootFolder.getChildrenByName("Folder1")
+        album = folder.getChildrenByName("Album1_1")
+        album.reload()
+
+        assert len(album.getImages()) == 2
 
     def NO_testScanRemoteWithDelete(self):
 
