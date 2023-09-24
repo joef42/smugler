@@ -134,12 +134,35 @@ def upload(path: Path, root):
         changes = scanNewFiles(path, root)
 
         if changes:
-
             refreshFromRemote(changes, root)
             changes = scanNewFiles(path, root)
             uploadChanges(path, changes, root)
         else:
+            logging.info("All in sync")
             break
+
+def printChanges(path: Path, changes):
+    if isinstance(changes, dict):
+        for name, subItems in changes.items():
+            subPath = path / name
+            printChanges(subPath, subItems)
+    
+    elif isinstance(changes, list):
+        logging.info(f"Missing {len(changes)} files in {path}")
+
+def scan(path: Path, root):
+
+    logging.info("Scanning for new files")
+
+    changes = scanNewFiles(path, root)
+    if changes:
+        refreshFromRemote(changes, root)
+        changes = scanNewFiles(path, root)
+
+    if changes:
+        printChanges(Path(), changes)
+    else:
+        logging.info("All in sync")
 
 def scanRemoteRecursive(path, parent):
     if not parent.isAlbum():
@@ -222,6 +245,8 @@ def main(args):
     try:
         if args.action == "sync":
             upload(imageDir, rootFolder)
+        elif args.action == "scan":
+            scan(imageDir, rootFolder)
         #elif args.action == "syncRemote":
         #    scanRemoteRecursive(imageDir, rootFolder)
     finally:
@@ -230,7 +255,7 @@ def main(args):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Sync folder to Smugmug')
-    parser.add_argument('action', type=str, choices=["sync"], help='sync: Upload images to Smugmug')
+    parser.add_argument('action', type=str, choices=["sync", "scan"], help='sync: Upload images to Smugmug')
     parser.add_argument('imagePath', type=str, help='Path to local gallery')
     parser.add_argument('--refresh', type=str, help='Refresh Folders/Albums with the given name from Smugmug. * for everything.')
     parser.add_argument('--debug', action='store_true', help='Print additional debug trace')

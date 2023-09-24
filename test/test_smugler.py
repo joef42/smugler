@@ -619,6 +619,26 @@ class TestSmugler(unittest.TestCase):
         self.assertUploadCount(2)
         self.assertPostCount(1)
 
+    def testScan(self):
+
+        self.createLocalFiles(self.tempDir, self.getTestStructure())
+        self.remote = self.getTestStructure()
+
+        with self.assertLogs() as cm:
+            smugler.main(Args("scan", self.tempDir))
+
+        self.assertIn("INFO:root:All in sync", cm.output)
+
+    def testScanMissing(self):
+
+        self.createLocalFiles(self.tempDir, {"Album1": ["File1.jpg", "File2.jpg", "File3.jpg"]})
+        self.remote = {"Album1": ["File1.jpg"]}
+
+        with self.assertLogs() as cm:
+            smugler.main(Args("scan", self.tempDir))
+
+        self.assertIn("INFO:root:Missing 2 files in Album1", cm.output)
+
     def testApiReloadFolder(self):
 
         self.remote = self.getTestStructure()
