@@ -35,7 +35,7 @@ class Args:
         self.refresh = refresh
         self.debug = debug
 
-class TestSmugler(unittest.TestCase):
+class TestSmuglerBase(unittest.TestCase):
 
     def setUp(self):
 
@@ -316,7 +316,7 @@ class TestSmugler(unittest.TestCase):
     def run(self, result=None):
 
         with requests_mock.Mocker() as self.request_mock:
-            super(TestSmugler, self).run(result)
+            super(TestSmuglerBase, self).run(result)
 
         #for r in self.request_mock.request_history:
         #    print(r.method)
@@ -346,6 +346,7 @@ class TestSmugler(unittest.TestCase):
                 "Album1" : ["File1_3.jpg", "File1_2.jpg", "File1_1.jpg"]
             }
 
+class TestSmuglerSync(TestSmuglerBase):
 
     def testSimpleEmptyUser(self):
         smugler.main(Args("sync", self.tempDir))
@@ -619,6 +620,8 @@ class TestSmugler(unittest.TestCase):
         self.assertUploadCount(2)
         self.assertPostCount(1)
 
+class TestSmuglerScan(TestSmuglerBase):
+
     def testScan(self):
 
         self.createLocalFiles(self.tempDir, self.getTestStructure())
@@ -639,6 +642,8 @@ class TestSmugler(unittest.TestCase):
 
         self.assertIn("INFO:root:Missing 2 files in Album1", cm.output)
 
+class TestSmugmugApi(TestSmuglerBase):
+    
     def testApiReloadFolder(self):
 
         self.remote = self.getTestStructure()
@@ -663,7 +668,7 @@ class TestSmugler(unittest.TestCase):
 
         self.assertLocalEqRemote()
 
-
+    # TODO: Test paging
 
 if __name__ == '__main__':
     unittest.main()
