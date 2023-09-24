@@ -255,7 +255,7 @@ def main(args):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Sync folder to Smugmug')
-    parser.add_argument('action', type=str, choices=["sync", "scan"], help='sync: Upload images to Smugmug')
+    parser.add_argument('action', type=str, choices=["sync", "scan"], help='sync: Upload images to Smugmug. scan: Scan for changes, but don\'t upload.')
     parser.add_argument('imagePath', type=str, help='Path to local gallery')
     parser.add_argument('--refresh', type=str, help='Refresh Folders/Albums with the given name from Smugmug. * for everything.')
     parser.add_argument('--debug', action='store_true', help='Print additional debug trace')
