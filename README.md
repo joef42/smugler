@@ -9,12 +9,12 @@ Uploads pictures/videos to Smugmug reflecting the local folder structures with f
 
 ## Usage
 ```
-usage: smugler.py [-h] [--refresh REFRESH] [--debug] {sync} imagePath
+usage: smugler.py [-h] [--refresh REFRESH] [--debug] {sync,scan} imagePath
 
 Sync folder to Smugmug
 
 positional arguments:
-  {sync}             sync: Upload images to Smugmug
+  {sync,scan}        sync: Upload images to Smugmug. scan: Scan for changes, but don't upload.
   imagePath          Path to local gallery
 
 options:
