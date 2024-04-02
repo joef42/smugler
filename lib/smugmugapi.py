@@ -67,6 +67,16 @@ class Album():
         self._filenameCache = dict()
         self.__load(resp, lazy)
 
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        if "_filenameCache" in state:
+            del state["_filenameCache"]
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self._filenameCache = dict()
+
     def __load(self, resp=None, lazy=True):
         if resp:
             self._resp = resp
