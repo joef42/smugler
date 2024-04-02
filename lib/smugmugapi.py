@@ -37,28 +37,24 @@ def extractUri(uri):
         return uri["Uri"]
     return uri
 
-fileNameFixes = (("_mp4.MP4", ".mp4"), (".MP4", ".mp4"))
+def normalizeName(name):
+    # Needed to match files. Smugmug API is sometimes
+    # returning a different extension to what was uploaded.
+    for ff in (("_mp4.MP4", ".mp4"), (".MP4", ".mp4")):
+        if name.endswith(ff[0]):
+            return name.replace(ff[0], ff[1])
+    return name
 
 class Image():
-
-    def fixFileName(self):
-        for ff in fileNameFixes:
-            if self._resp["FileName"].endswith(ff[0]):
-                fixedFileName = self._resp["FileName"].replace(ff[0], ff[1])
-                logging.debug("Fixed filename: %s -> %s", self._resp["FileName"], fixedFileName)
-                self._resp["FileName"] = fixedFileName
-                break
 
     def __init__(self, resp):
         super().__init__()
         self._resp = resp
-        self.fixFileName()
 
     def __str__(self):
         return "%s [Image]" % (self.getFileName())
 
     def getFileName(self):
-        self.fixFileName()
         return self._resp["FileName"]
 
     def toString(self, depth=0):
@@ -107,9 +103,12 @@ class Album():
     def hasImage(self, path):
         if not self._filenameCache:
             for img in self._images:
-                self._filenameCache[img.getFileName()] = img
+                self._filenameCache[normalizeName(img.getFileName())] = img
 
-        return path.name in self._filenameCache
+        from pathlib import Path
+        assert isinstance(path, Path)
+
+        return normalizeName(path.name) in self._filenameCache
 
     def getImages(self):
         return self._images

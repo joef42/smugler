@@ -661,6 +661,26 @@ class TestSmugmugApi(TestSmuglerBase):
 
         self.assertEqual(len(album.getImages()), 2)
 
+    def testHandleBadExtension(self):
+
+        self.remote = {"Album1": ["Video1.MP4", "Video2_mp4.MP4", "Picture1.jpg", "Picture2.JPG"]}
+
+        rootFolder = Folder(lazy=True)
+        rootFolder.reload()
+
+        album = rootFolder.getChildrenByName("Album1")
+
+        self.assertTrue(album.hasImage(Path("Video1.mp4")))
+        self.assertTrue(album.hasImage(Path("Video1.MP4")))
+        self.assertTrue(album.hasImage(Path("Video2.mp4")))
+        self.assertTrue(album.hasImage(Path("Video2.MP4")))
+        self.assertTrue(album.hasImage(Path("Video2_mp4.MP4")))
+
+        self.assertTrue(album.hasImage(Path("Picture1.jpg")))
+        self.assertFalse(album.hasImage(Path("Picture1.JPG")))
+        self.assertTrue(album.hasImage(Path("Picture2.JPG")))
+        self.assertFalse(album.hasImage(Path("Picture2.jpg")))
+
     def NO_testScanRemoteWithDelete(self):
 
         self.createLocalFiles(self.tempDir, {"Folder1": {"Album1": ["File1.jpg"]}})
