@@ -643,12 +643,14 @@ class TestSmuglerScan(TestSmuglerBase):
         self.assertIn("INFO:root:Missing 2 files in Album1", cm.output)
 
 class TestSmugmugApi(TestSmuglerBase):
-    
+
+    def setUp(self):
+        super(TestSmugmugApi, self).setUp()
+        SmugMug(self.tokenFile, self.config)
+  
     def testApiReloadFolder(self):
 
         self.remote = self.getTestStructure()
-
-        SmugMug(self.tokenFile, self.config)
 
         rootFolder = Folder(lazy=True)
         rootFolder.reload()
@@ -657,7 +659,7 @@ class TestSmugmugApi(TestSmuglerBase):
         album = folder.getChildrenByName("Album1_1")
         album.reload()
 
-        assert len(album.getImages()) == 2
+        self.assertEqual(len(album.getImages()), 2)
 
     def NO_testScanRemoteWithDelete(self):
 
