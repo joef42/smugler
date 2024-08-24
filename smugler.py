@@ -38,7 +38,7 @@ def error_callback(error):
 
 def uploadFiles(node, files):
     failCount = 0
-    for f in files:
+    for f in sorted(files):
         try:
             node.upload(f)
             failCount = 0
